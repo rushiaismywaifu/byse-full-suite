@@ -29,10 +29,13 @@ jobs:
                       print(f"{url} ERR {e}")
           PY
       - name: Check with real key if secret present
-        if: ${{ secrets.BYSE_API_KEY != '' }}
         env:
           BYSE_API_KEY: ${{ secrets.BYSE_API_KEY }}
         run: |
+          if [ -z "$BYSE_API_KEY" ]; then
+            echo "No BYSE_API_KEY, skip"
+            exit 0
+          fi
           python - << 'PY'
           import os, requests
           key=os.getenv("BYSE_API_KEY")
