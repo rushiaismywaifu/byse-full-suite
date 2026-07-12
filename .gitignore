@@ -1,0 +1,21 @@
+# Secrets - 絕對不要 push
+repo.json
+.env
+.byse/
+config.json
+byse_key.txt
+*.key
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.DS_Store
+ui_shigure.mkv
+*.mp4
+*.mkv
+*.avi
+*.mov
+
+# 本地測試檔案
+test_upload/
+uploads/
