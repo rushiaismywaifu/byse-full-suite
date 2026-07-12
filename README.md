@@ -1,5 +1,11 @@
 # Byse.sx / Filemoon 完整 API 套件 - Byse Full Suite
 
+![CI](https://github.com/rushiaismywaifu/byse-full-suite/actions/workflows/ci.yml/badge.svg)
+![Health Check](https://github.com/rushiaismywaifu/byse-full-suite/actions/workflows/health-check.yml/badge.svg)
+![GitHub Pages](https://img.shields.io/badge/Powered%20by-GitHub%20Pages-blue)
+![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB)
+
+
 `byse.sx` 是 `filemoon.sx` 改名後的影片託管、分發、變現平台，提供 26 個 CDN 節點、上傳、轉碼、自訂網域、廣告分潤等功能。
 
 本專案完整封裝 **12 群組 29+ 端點**，包含 SDK、CLI、網頁儀表板，避免把機敏資料 push 上去。
