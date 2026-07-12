@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Byse Full Suite - 完整 API 儀表板</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:ui-sans-system,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Noto Sans TC,sans-serif;background:#0b0e14;color:#e6e8ee}
+header{padding:16px 20px;background:#11151f;border-bottom:1px solid #1e2636;display:flex;flex-wrap:wrap;gap:12px;align-items:center;position:sticky;top:0;z-index:10}
+header h1{margin:0;font-size:18px;letter-spacing:.5px}
+header input,header select{padding:8px 10px;border-radius:8px;border:1px solid #2a344a;background:#0e1320;color:#e6e8ee;min-width:260px}
+header button{padding:8px 14px;border-radius:8px;border:0;background:#4f6ef7;color:white;cursor:pointer;font-weight:600}
+header button.secondary{background:#1e2636}
+nav{display:flex;gap:8px;padding:12px 20px;background:#0e1320;border-bottom:1px solid #1e2636;overflow:auto}
+nav button{white-space:nowrap;padding:8px 14px;border-radius:999px;border:1px solid #2a344a;background:#111827;color:#cbd5e1;cursor:pointer}
+nav button.active{background:#4f6ef7;color:white;border-color:#4f6ef7}
+main{padding:20px;max-width:1200px;margin:0 auto}
+.card{background:#11151f;border:1px solid #1e2636;border-radius:16px;padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 12px 0;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+label{display:block;font-size:12px;color:#9aa4b2;margin-bottom:6px}
+input[type=text],input[type=number],textarea,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2a344a;background:#0b1220;color:#e6e8ee}
+textarea{min-height:80px;resize:vertical}
+button{padding:9px 14px;border-radius:10px;border:0;background:#4f6ef7;color:white;cursor:pointer;font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.small{padding:6px 10px;font-size:12px;border-radius:8px}
+button.ghost{background:#1c2333;border:1px solid #2a344a}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 8px;border-bottom:1px solid #1e2636;text-align:left}
+th{color:#9aa4b2;font-weight:600;background:#0e1320;position:sticky;top:0}
+tr:hover{background:#131a2a}
+code{background:#1a2336;padding:2px 6px;border-radius:6px;font-size:12px;word-break:break-all}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#1e2636;font-size:11px;color:#9aa4b2}
+.badge.ok{background:#123522;color:#6ee7a5}
+.badge.err{background:#3a1515;color:#fda4af}
+.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.muted{color:#9aa4b2;font-size:12px}
+.progress{height:8px;background:#1e2636;border-radius:999px;overflow:hidden}
+.progress div{height:100%;background:#4f6ef7;width:0%}
+.log{max-height:300px;overflow:auto;background:#0a0e18;border:1px solid #1e2636;border-radius:12px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre-wrap}
+#drop{border:2px dashed #2a344a;border-radius:16px;padding:30px;text-align:center;background:#0e1320}
+#drop.drag{border-color:#4f6ef7;background:#141c2f}
+</style>
+</head>
+<body>
+<header>
+<h1>Byse Full Suite</h1>
+<input id="apiKey" type="text" placeholder="輸入 API Key (請輸入你的 API Key)"/>
+<select id="baseUrl">
+<option value="https://api.byse.sx" selected>https://api.byse.sx (新版可用)</option>
+<option value="https://filemoonapi.com/api">https://filemoonapi.com/api (舊版 522)</option>
+</select>
+<button onclick="saveConfig()">儲存</button>
+<button class="secondary" onclick="testAll()">測試所有端點</button>
+<span class="muted">12群組 29+端點 | 來源 byse.sx/api-docs</span>
+</header>
+
+<nav>
+<button data-tab="dashboard" class="active" onclick="switchTab('dashboard')">帳號總覽</button>
+<button data-tab="files" onclick="switchTab('files')">檔案管理</button>
+<button data-tab="folders" onclick="switchTab('folders')">資料夾</button>
+<button data-tab="upload" onclick="switchTab('upload')">上傳中心</button>
+<button data-tab="encoding" onclick="switchTab('encoding')">編碼監控</button>
+<button data-tab="tools" onclick="switchTab('tools')">工具箱 & DMCA</button>
+</nav>
+
+<main>
+<!-- Dashboard -->
+<div id="tab-dashboard" class="tab">
+<div class="grid">
+<div class="card"><h2>帳號資訊 / account/info</h2><div id="accountInfo">尚未載入</div><div style="margin-top:10px"><button onclick="loadAccountInfo()">重新載入</button></div></div>
+<div class="card"><h2>近 7 天統計 / account/stats</h2><div id="accountStats">尚未載入</div><button onclick="loadAccountStats()">載入</button></div>
+<div class="card"><h2>儲存 / 測試</h2><div id="testAllResult" class="log">點上方 測試所有端點</div><button onclick="loadEmbedDomains()">嘗試取得 embed domain</button><div id="embedDomainResult" class="muted" style="margin-top:8px"></div></div>
+</div>
+</div>
+
+<!-- Files -->
+<div id="tab-files" class="tab" style="display:none">
+<div class="card">
+<h2>檔案列表 / file/list</h2>
+<div class="flex">
+<label>資料夾ID <input id="fileFldId" type="number" value="0" style="width:90px"/></label>
+<label>每頁 <input id="filePerPage" type="number" value="20" style="width:70px"/></label>
+<label>頁碼 <input id="filePage" type="number" value="1" style="width:70px"/></label>
+<label>標題關鍵字 <input id="fileTitle" type="text" placeholder="Iron man" style="width:160px"/></label>
+<button onclick="loadFileList()">載入</button>
+</div>
+<div style="overflow:auto; max-height:500px; margin-top:12px"><table><thead><tr><th>filecode</th><th>標題</th><th>長度</th><th>views</th><th>canplay</th><th>操作</th></tr></thead><tbody id="fileTable"></tbody></table></div>
+</div>
+
+<div class="card">
+<h2>檔案操作 / file/info, file/clone, file/edit, images/*</h2>
+<div class="grid">
+<div><label>Filecode (可多個逗號分隔)</label><input id="opFileCode" type="text" placeholder="1vtkmhfb44rj"/></div>
+<div><label>新標題</label><input id="opNewTitle" type="text"/></div>
+</div>
+<div class="flex" style="margin-top:10px">
+<button onclick="doFileInfo()">詳情 file/info</button>
+<button onclick="doFileClone()">克隆 file/clone</button>
+<button onclick="doFileEditTitle()">改標題 file/edit</button>
+<button onclick="doFileEditPublic(1)">設公開</button>
+<button onclick="doFileEditPublic(0)">設私有</button>
+<button onclick="doThumb()">縮圖 thumb</button>
+<button onclick="doSplash()">海報 splash</button>
+<button onclick="doPreview()">預覽 preview</button>
+<button onclick="doGenerateEmbed()">產生 Embed</button>
+</div>
+<div id="fileOpResult" class="log" style="margin-top:12px">結果顯示</div>
+</div>
+</div>
+
+<!-- Folders -->
+<div id="tab-folders" class="tab" style="display:none">
+<div class="card">
+<h2>資料夾列表 / folder/list</h2>
+<label>父資料夾ID <input id="folderParentId" type="number" value="0" style="width:100px"/></label>
+<button onclick="loadFolderList()">載入</button>
+<div id="folderList" class="log" style="margin-top:10px"></div>
+</div>
+<div class="card">
+<h2>建立資料夾 / folder/create</h2>
+<div class="grid">
+<div><label>名稱</label><input id="newFolderName" type="text" placeholder="My Videos"/></div>
+<div><label>父ID</label><input id="newFolderParent" type="number" value="0"/></div>
+<div><label>描述</label><input id="newFolderDescr" type="text"/></div>
+</div>
+<button onclick="createFolder()" style="margin-top:10px">建立</button>
+<div id="folderCreateResult" class="log" style="margin-top:10px"></div>
+</div>
+</div>
+
+<!-- Upload -->
+<div id="tab-upload" class="tab" style="display:none">
+<div class="card">
+<h2>本地上傳 / upload/server + POST</h2>
+<div id="drop">拖曳影片到這裡，或 <input type="file" id="localFile" multiple/> <div class="muted">支援 MP4,MKV,AVI,WEBM,MOV等12種格式</div></div>
+<div class="flex" style="margin-top:10px"><label>目標資料夾ID <input id="uploadFolderId" type="number" value="0" style="width:100px"/></label><button onclick="uploadLocalFiles()">開始上傳</button></div>
+<div id="uploadProgress" class="log" style="margin-top:10px">等待上傳...</div>
+</div>
+
+<div class="card">
+<h2>遠端上傳 / remote/add (舊) & upload/url (新)</h2>
+<div class="grid"><div><label>直鏈 URL</label><input id="remoteUrl" type="text" placeholder="https://example.com/video.mp4"/></div><div><label>資料夾ID</label><input id="remoteFolderId" type="number" value="0"/></div></div>
+<div class="flex" style="margin-top:10px"><button onclick="remoteUpload()">遠端拉取</button><button class="ghost" onclick="loadRemoteStatusPrompt()">查進度 remote/status</button><button class="ghost" onclick="removeRemotePrompt()">移除佇列 remote/remove</button></div>
+<div id="remoteResult" class="log" style="margin-top:10px"></div>
+</div>
+</div>
+
+<!-- Encoding -->
+<div id="tab-encoding" class="tab" style="display:none">
+<div class="card"><h2>編碼佇列 / encoding/list</h2><button onclick="loadEncodingList()">載入</button><div id="encodingList" class="log" style="margin-top:10px"></div></div>
+<div class="card"><h2>單檔編碼狀態 / encoding/status, restart, delete</h2><div class="flex"><input id="encFileCode" type="text" placeholder="filecode"/><button onclick="loadEncStatus()">狀態</button><button onclick="encRestart()">重啟 restart</button><button onclick="encDelete()">刪除 delete</button></div><div id="encResult" class="log" style="margin-top:10px"></div></div>
+</div>
+
+<!-- Tools -->
+<div id="tab-tools" class="tab" style="display:none">
+<div class="grid">
+<div class="card"><h2>已刪除檔案 / files/deleted</h2><button onclick="loadDeleted()">載入</button><div id="deletedResult" class="log"></div></div>
+<div class="card"><h2>DMCA 清單 / files/dmca</h2><button onclick="loadDMCA()">載入</button><div id="dmcaResult" class="log"></div></div>
+</div>
+
+<div class="card">
+<h2>進階工具：字幕 / 封面 / Logo / HLS / Embed</h2>
+<div class="grid">
+<div><label>Filecode</label><input id="toolFileCode" type="text" placeholder="1vtkmhfb44rj"/></div>
+<div><label>Embed Domain (去後台 Custom Domains 看)</label><input id="toolDomain" type="text" value="byse.sx"/></div>
+<div><label>字幕 VTT URL (c1_file)</label><input id="toolSubUrl" type="text" placeholder="https://example.com/en.vtt"/></div>
+<div><label>字幕標籤 (c1_label)</label><input id="toolSubLabel" type="text" value="English"/></div>
+<div><label>Poster 封面 URL</label><input id="toolPoster" type="text" placeholder="https://example.com/poster.jpg"/></div>
+<div><label>Logo URL</label><input id="toolLogo" type="text" placeholder="https://example.com/logo.png"/></div>
+<div><label>Premium HLS: 觀看者 IP</label><input id="toolIp" type="text" value="8.8.8.8"/></div>
+<div><label>Premium HLS: User-Agent</label><input id="toolUa" type="text" value="Mozilla/5.0 (iPhone)"/></div>
+</div>
+<div class="flex" style="margin-top:12px">
+<button onclick="generateEmbedAdvanced()">產生 Embed URL + Iframe</button>
+<button class="ghost" onclick="tryPremiumHls()">嘗試 Premium HLS (實驗性)</button>
+</div>
+<div id="toolResult" class="log" style="margin-top:12px"></div>
+<div id="toolIframePreview" style="margin-top:12px"></div>
+</div>
+
+<div class="card">
+<h2>Byse Progress 事件監聽 (window.postMessage byse-progress)</h2>
+<p class="muted">當 embed 播放器在 iframe 內播放時，會用 postMessage 回報進度。下方可即時監聽。</p>
+<div id="progressEvents" class="log">等待 byse-progress 事件...</div>
+<iframe id="testPlayer" width="0" height="0" style="border:0"></iframe>
+</div>
+</div>
+
+</main>
+
+<script>
+let API_KEY = localStorage.getItem('byse_api_key') || '';
+let BASE_URL = localStorage.getItem('byse_base') || 'https://api.byse.sx';
+document.getElementById('apiKey').value = API_KEY;
+document.getElementById('baseUrl').value = BASE_URL;
+
+function saveConfig(){
+  API_KEY = document.getElementById('apiKey').value.trim();
+  BASE_URL = document.getElementById('baseUrl').value.trim();
+  localStorage.setItem('byse_api_key', API_KEY);
+  localStorage.setItem('byse_base', BASE_URL);
+  alert('已儲存');
+}
+
+function apiUrl(path, params={}){
+  params.key = API_KEY;
+  const qs = new URLSearchParams(params).toString();
+  return `${BASE_URL.replace(/\/$/,'')}/${path.replace(/^\//,'')}?${qs}`;
+}
+
+async function fetchJson(path, params={}, allow400=false){
+  if(!API_KEY) throw new Error('請先輸入 API Key');
+  const url = apiUrl(path, params);
+  const r = await fetch(url);
+  const text = await r.text();
+  try{
+    const j = JSON.parse(text);
+    if(!allow400 && j.status==400 && j.msg=='Invalid operation') throw new Error(`Invalid operation: ${path}`);
+    if(j.msg=='Wrong Auth') throw new Error('Wrong Auth - API Key 錯誤');
+    return j;
+  }catch(e){
+    if(text.includes('Page not found')) throw new Error(`${path} 404 前端`);
+    throw e;
+  }
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(el=>el.style.display='none');
+  document.getElementById('tab-'+name).style.display='block';
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`nav button[data-tab=${name}]`).classList.add('active');
+}
+
+async function loadAccountInfo(){
+  try{
+    const data = await fetchJson('account/info');
+    document.getElementById('accountInfo').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>
+    <div>餘額: ${data.result?.balance} | 檔案: ${data.result?.files_total} | Email: ${data.result?.email}</div>`;
+  }catch(e){document.getElementById('accountInfo').textContent='錯誤: '+e.message}
+}
+async function loadAccountStats(){
+  try{
+    const data = await fetchJson('account/stats', {last:7});
+    document.getElementById('accountStats').innerHTML = `<pre>${JSON.stringify(data,null,2)}</pre>`;
+  }catch(e){document.getElementById('accountStats').textContent='錯誤: '+e.message}
+}
+async function loadEmbedDomains(){
+  const paths = ['account/embed_domains','file/embed_domains','account/custom_domain'];
+  let out='';
+  for(const p of paths){
+    try{
+      const d = await fetchJson(p);
+      out+= `${p}: ${JSON.stringify(d).slice(0,600)}\n`;
+    }catch(e){ out+= `${p} ERR: ${e.message}\n`; }
+  }
+  document.getElementById('embedDomainResult').textContent = out || '無，請到後台 Settings -> Custom Domains';
+}
+
+async function testAll(){
+  const endpoints = [
+    'account/info','account/stats','upload/server','file/list','folder/list','files/deleted','files/dmca','encoding/list'
+  ];
+  let log='';
+  for(const ep of endpoints){
+    try{
+      const params = ep.includes('file/list')?{fld_id:0,per_page:1}:{};
+      const data = await fetchJson(ep, params);
+      log+= `✅ ${ep} OK: ${JSON.stringify(data).slice(0,200)}\n`;
+    }catch(e){ log+= `❌ ${ep} ERR: ${e.message}\n`; }
+  }
+  document.getElementById('testAllResult').textContent = log;
+  loadAccountInfo();
+}
+
+// Files
+async function loadFileList(){
+  const fld_id=document.getElementById('fileFldId').value||0;
+  const per_page=document.getElementById('filePerPage').value||20;
+  const page=document.getElementById('filePage').value||1;
+  const title=document.getElementById('fileTitle').value||'';
+  try{
+    const data = await fetchJson('file/list',{fld_id,per_page,page,title: title||undefined});
+    const tbody=document.getElementById('fileTable');
+    tbody.innerHTML='';
+    let files=[];
+    if(data.result && data.result.files) files=data.result.files;
+    else if(Array.isArray(data.result)) files=data.result;
+    files.forEach(f=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td><code>${f.file_code}</code></td><td>${(f.title||'').slice(0,40)}</td><td>${f.length||''}</td><td>${f.views||0}</td><td>${f.canplay||0}</td><td><button class="small" onclick="setOpCode('${f.file_code}')">選取</button> <button class="small ghost" onclick="quickInfo('${f.file_code}')">詳情</button></td>`;
+      tbody.appendChild(tr);
+    });
+  }catch(e){alert(e.message)}
+}
+function setOpCode(code){document.getElementById('opFileCode').value=code; document.getElementById('toolFileCode').value=code; document.getElementById('encFileCode').value=code;}
+async function quickInfo(code){document.getElementById('opFileCode').value=code; doFileInfo();}
+
+async function doFileInfo(){
+  const code=document.getElementById('opFileCode').value.trim();
+  if(!code) return alert('輸入 filecode');
+  try{
+    const data=await fetchJson('file/info',{file_code:code});
+    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
+}
+async function doFileClone(){
+  const code=document.getElementById('opFileCode').value.trim();
+  try{
+    const data=await fetchJson('file/clone',{file_code:code});
+    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
+}
+async function doFileEditTitle(){
+  const code=document.getElementById('opFileCode').value.trim();
+  const title=document.getElementById('opNewTitle').value.trim();
+  if(!title) return alert('輸入新標題');
+  try{
+    const data=await fetchJson('file/edit',{file_code:code,file_title:title});
+    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
+}
+async function doFileEditPublic(pub){
+  const code=document.getElementById('opFileCode').value.trim();
+  try{
+    const data=await fetchJson('file/edit',{file_code:code,file_public:pub});
+    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
+}
+async function doThumb(){
+  const code=document.getElementById('opFileCode').value.trim();
+  try{
+    const data=await fetchJson('images/thumb',{file_code:code});
+    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
+}
+async function doSplash(){
+  const code=document.getElementById('opFileCode').value.trim();
+  try{
+    const data=await fetchJson('images/splash',{file_code:code});
+    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
+}
+async function doPreview(){
+  const code=document.getElementById('opFileCode').value.trim();
+  try{
+    const data=await fetchJson('images/preview',{file_code:code});
+    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
+}
+function doGenerateEmbed(){
+  const code=document.getElementById('opFileCode').value.trim();
+  const domain=document.getElementById('toolDomain').value||'byse.sx';
+  const url=`https://${domain}/e/${code}`;
+  document.getElementById('fileOpResult').textContent=`Embed URL: ${url}\nIframe: <iframe src="${url}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
+}
+
+// Folders
+async function loadFolderList(){
+  const fld=document.getElementById('folderParentId').value||0;
+  try{
+    const data=await fetchJson('folder/list',{fld_id:fld});
+    document.getElementById('folderList').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('folderList').textContent='ERR: '+e.message}
+}
+async function createFolder(){
+  const name=document.getElementById('newFolderName').value.trim();
+  const parent=document.getElementById('newFolderParent').value||0;
+  const descr=document.getElementById('newFolderDescr').value||'';
+  if(!name) return alert('輸入名稱');
+  try{
+    const data=await fetchJson('folder/create',{name,parent_id:parent,descr});
+    document.getElementById('folderCreateResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('folderCreateResult').textContent='ERR: '+e.message}
+}
+
+// Upload
+const drop=document.getElementById('drop');
+if(drop){
+  drop.addEventListener('dragover', e=>{e.preventDefault(); drop.classList.add('drag')});
+  drop.addEventListener('dragleave', ()=>drop.classList.remove('drag'));
+  drop.addEventListener('drop', e=>{e.preventDefault(); drop.classList.remove('drag'); document.getElementById('localFile').files=e.dataTransfer.files;});
+}
+async function getUploadServer(){
+  const data=await fetchJson('upload/server');
+  return data.result;
+}
+async function uploadLocalFiles(){
+  const input=document.getElementById('localFile');
+  const fld=document.getElementById('uploadFolderId').value||0;
+  const log=document.getElementById('uploadProgress');
+  if(!input.files.length) return alert('選檔案');
+  log.textContent='取得上傳伺服器...\n';
+  try{
+    const server = await getUploadServer();
+    log.textContent+=`Server: ${server}\n`;
+    for(const file of input.files){
+      log.textContent+=`\n上傳 ${file.name} (${(file.size/1024/1024).toFixed(2)}MB)...\n`;
+      const form=new FormData();
+      form.append('key', API_KEY);
+      form.append('file', file);
+      if(fld!=0) form.append('fld_id', fld);
+      const resp=await fetch(server, {method:'POST', body:form});
+      const text=await resp.text();
+      log.textContent+=`回應: ${text.slice(0,2000)}\n`;
+      try{
+        const j=JSON.parse(text);
+        if(j.files&&j.files[0]){
+          const fc=j.files[0].filecode;
+          log.textContent+=`✅ 成功 filecode=${fc} => https://byse.sx/e/${fc}\n`;
+        }
+      }catch{}
+    }
+  }catch(e){log.textContent+='ERR: '+e.message}
+}
+async function remoteUpload(){
+  const url=document.getElementById('remoteUrl').value.trim();
+  const fld=document.getElementById('remoteFolderId').value||0;
+  if(!url) return alert('輸入 URL');
+  try{
+    const data=await fetchJson('remote/add',{url,fld_id:fld}, true);
+    document.getElementById('remoteResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){
+    // fallback upload/url
+    try{
+      const data2=await fetchJson('upload/url',{url,fld_id:fld}, true);
+      document.getElementById('remoteResult').textContent=JSON.stringify(data2,null,2);
+    }catch(e2){document.getElementById('remoteResult').textContent='ERR: '+e.message+' / '+e2.message;}
+  }
+}
+async function loadRemoteStatusPrompt(){
+  const code=prompt('輸入遠端 filecode');
+  if(!code) return;
+  try{
+    const data=await fetchJson('remote/status',{file_code:code}, true);
+    document.getElementById('remoteResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('remoteResult').textContent='ERR: '+e.message}
+}
+async function removeRemotePrompt(){
+  const code=prompt('輸入要移除的 filecode');
+  if(!code) return;
+  try{
+    const data=await fetchJson('remote/remove',{file_code:code}, true);
+    document.getElementById('remoteResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('remoteResult').textContent='ERR: '+e.message}
+}
+
+// Encoding
+async function loadEncodingList(){
+  try{
+    const data=await fetchJson('encoding/list');
+    document.getElementById('encodingList').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('encodingList').textContent='ERR: '+e.message}
+}
+async function loadEncStatus(){
+  const code=document.getElementById('encFileCode').value.trim();
+  if(!code) return alert('輸入 filecode');
+  try{
+    const data=await fetchJson('encoding/status',{file_code:code});
+    document.getElementById('encResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('encResult').textContent='ERR: '+e.message}
+}
+async function encRestart(){
+  const code=document.getElementById('encFileCode').value.trim();
+  try{
+    const data=await fetchJson('encoding/restart',{file_code:code}, true);
+    document.getElementById('encResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('encResult').textContent='ERR: '+e.message}
+}
+async function encDelete(){
+  const code=document.getElementById('encFileCode').value.trim();
+  try{
+    const data=await fetchJson('encoding/delete',{file_code:code}, true);
+    document.getElementById('encResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('encResult').textContent='ERR: '+e.message}
+}
+
+// Tools
+async function loadDeleted(){
+  try{
+    const data=await fetchJson('files/deleted');
+    document.getElementById('deletedResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('deletedResult').textContent='ERR: '+e.message}
+}
+async function loadDMCA(){
+  try{
+    const data=await fetchJson('files/dmca');
+    document.getElementById('dmcaResult').textContent=JSON.stringify(data,null,2);
+  }catch(e){document.getElementById('dmcaResult').textContent='ERR: '+e.message}
+}
+function generateEmbedAdvanced(){
+  const code=document.getElementById('toolFileCode').value.trim();
+  const domain=document.getElementById('toolDomain').value||'byse.sx';
+  const subUrl=document.getElementById('toolSubUrl').value.trim();
+  const subLabel=document.getElementById('toolSubLabel').value.trim()||'English';
+  const poster=document.getElementById('toolPoster').value.trim();
+  const logo=document.getElementById('toolLogo').value.trim();
+  if(!code) return alert('輸入 filecode');
+  const params=new URLSearchParams();
+  if(subUrl){ params.set('c1_file', subUrl); params.set('c1_label', subLabel); }
+  if(poster) params.set('poster', poster);
+  if(logo) params.set('logo', logo);
+  const base=`https://${domain}/e/${code}`;
+  const url = params.toString()? `${base}?${params.toString()}`: base;
+  const iframe=`<iframe src="${url}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
+  document.getElementById('toolResult').textContent=`URL:\n${url}\n\nIframe:\n${iframe}`;
+  document.getElementById('toolIframePreview').innerHTML=iframe;
+  // 同時試聽 byse-progress
+  document.getElementById('testPlayer').src=url;
+}
+async function tryPremiumHls(){
+  const code=document.getElementById('toolFileCode').value.trim();
+  const ip=document.getElementById('toolIp').value||'8.8.8.8';
+  const ua=document.getElementById('toolUa').value||'Mozilla/5.0';
+  if(!code) return alert('輸入 filecode');
+  const candidates=['file/hls','file/premium_link','file/direct_link','account/hls'];
+  let out='';
+  for(const p of candidates){
+    try{
+      const data=await fetchJson(p,{file_code:code,ip,ua}, true);
+      out+= `${p}: ${JSON.stringify(data).slice(0,800)}\n`;
+    }catch(e){ out+= `${p} ERR: ${e.message}\n`; }
+  }
+  document.getElementById('toolResult').textContent=out || 'Premium HLS 需帳號開通 premium';
+}
+
+// byse-progress listener
+window.addEventListener('message', (event)=>{
+  const data=event.data;
+  if(!data || data.type!=='byse-progress') return;
+  const log=document.getElementById('progressEvents');
+  const line=`[${new Date().toLocaleTimeString()}] file:${data.file_code} ${data.progress}% ${data.timestamp}/${data.duration}s`;
+  log.textContent = line + '\n' + log.textContent.slice(0,3000);
+});
+
+// init
+if(API_KEY) { loadAccountInfo(); }
+</script>
+</body>
+</html>
+<!-- Manual deploy Sun Jul 12 07:58:46 UTC 2026 -->
