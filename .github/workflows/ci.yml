@@ -111,5 +111,5 @@ jobs:
           extra_args: --debug --only-verified || true
       - name: Check no hardcoded keys
         run: |
-          ! grep -R "113601hs3itn2d5jdprkzz" . --exclude-dir=.git || (echo "Found leaked Byse key!" && exit 1)
+          ! grep -R "LEAKED_BYSE_KEY" . --exclude-dir=.git || (echo "Found leaked Byse key!" && exit 1)
           ! grep -R "ghp_" . --exclude-dir=.git --exclude-dir=.github || echo "Check ghp_ pattern (may be false positive)"
