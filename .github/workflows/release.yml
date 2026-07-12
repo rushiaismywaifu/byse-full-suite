@@ -1,0 +1,63 @@
+name: Release to PyPI & GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '手動發版版本號，例如 v2.1.0'
+        required: false
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build package
+        run: |
+          pip install build
+          # 簡單的 pyproject.toml 自動生成 (若沒有)
+          if [ ! -f pyproject.toml ]; then
+          cat > pyproject.toml << 'PYTOML'
+          [build-system]
+          requires = ["setuptools>=61.0"]
+          build-backend = "setuptools.build_meta"
+          [project]
+          name = "byse-full-suite"
+          version = "2.0.0"
+          description = "Byse.sx / Filemoon 完整 API SDK + CLI + Dashboard + Downloader"
+          readme = "README.md"
+          requires-python = ">=3.8"
+          dependencies = ["requests","tqdm"]
+          [project.optional-dependencies]
+          rich = ["rich"]
+          ytdlp = ["yt-dlp"]
+          [project.scripts]
+          byse-cli = "byse_full_suite.cli:main"
+          byse-downloader = "byse_full_suite.downloader:main"
+          PYTOML
+          fi
+          python -m build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+
+      - name: Publish to PyPI (需要 PYPI_API_TOKEN secret)
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+

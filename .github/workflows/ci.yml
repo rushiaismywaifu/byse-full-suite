@@ -1,0 +1,115 @@
+name: Byse CI & Pages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # 每天 09:00 UTC = 17:00 台北，檢查 byse.sx API 是否還活著
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint & Test SDK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests rich flake8 black
+          pip install yt-dlp
+
+      - name: Lint with flake8
+        run: |
+          # 只檢查語法錯誤，風格警告不阻擋
+          flake8 byse_full_suite/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 byse_full_suite/ --count --max-complexity=15 --max-line-length=120 --statistics || true
+
+      - name: Check formatting with black
+        run: |
+          black --check byse_full_suite/ || echo "black format warning"
+
+      - name: Test SDK test_all (需要 BYSE_API_KEY)
+        if: ${{ secrets.BYSE_API_KEY != '' }}
+        env:
+          BYSE_API_KEY: ${{ secrets.BYSE_API_KEY }}
+        run: |
+          python byse_full_suite/cli.py --non-interactive
+          python -c "
+          from byse_full_suite.sdk import ByseSDK
+          import os
+          key=os.getenv('BYSE_API_KEY')
+          sdk=ByseSDK(key)
+          print('account/info:', sdk.account_info().get('status'))
+          print('upload/server:', sdk.upload_server())
+          print('file/list:', sdk.file_list(per_page=1).get('status'))
+          "
+
+      - name: Test SDK without key (public endpoints check)
+        if: ${{ secrets.BYSE_API_KEY == '' }}
+        run: |
+          echo "No BYSE_API_KEY secret set, skip private tests"
+          python -m py_compile byse_full_suite/sdk.py byse_full_suite/cli.py byse_full_suite/downloader.py byse_uploader.py
+
+  deploy-pages:
+    name: Deploy Dashboard to GitHub Pages
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare Pages artifact
+        run: |
+          mkdir -p _pages
+          cp -r byse_full_suite/dashboard.html _pages/index.html
+          cp -r byse_full_suite _pages/
+          cp README.md _pages/
+          echo "<!-- Deployed at $(date) -->" >> _pages/index.html
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_pages
+          publish_branch: gh-pages
+          commit_message: "docs: deploy dashboard to pages (auto)"
+
+  security-scan:
+    name: Secret Scan & CodeQL (light)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: TruffleHog OSS - scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified || true
+      - name: Check no hardcoded keys
+        run: |
+          ! grep -R "113601hs3itn2d5jdprkzz" . --exclude-dir=.git || (echo "Found leaked Byse key!" && exit 1)
+          ! grep -R "ghp_" . --exclude-dir=.git --exclude-dir=.github || echo "Check ghp_ pattern (may be false positive)"

@@ -1,0 +1,46 @@
+name: Byse API Health Check
+
+on:
+  schedule:
+    - cron: '0 1 * * *' # 每天 09:00 台北
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Check api.byse.sx health (no key)
+        run: |
+          python - << 'PY'
+          import requests
+          bases = ["https://api.byse.sx", "https://filemoonapi.com/api"]
+          for base in bases:
+              for path in ["account/info", "upload/server"]:
+                  url = f"{base}/{path}"
+                  try:
+                      r = requests.get(url, params={"key":"invalidkey"}, timeout=10)
+                      print(f"{url} -> {r.status_code} {r.text[:200]}")
+                  except Exception as e:
+                      print(f"{url} ERR {e}")
+          PY
+      - name: Check with real key if secret present
+        if: ${{ secrets.BYSE_API_KEY != '' }}
+        env:
+          BYSE_API_KEY: ${{ secrets.BYSE_API_KEY }}
+        run: |
+          python - << 'PY'
+          import os, requests
+          key=os.getenv("BYSE_API_KEY")
+          base="https://api.byse.sx"
+          for path in ["account/info","upload/server","file/list","folder/list","encoding/list"]:
+              try:
+                  r=requests.get(f"{base}/{path}", params={"key":key,"fld_id":0,"per_page":1}, timeout=15)
+                  print(f"{path}: {r.status_code} {r.text[:300]}")
+              except Exception as e:
+                  print(f"{path} ERR {e}")
+          PY
