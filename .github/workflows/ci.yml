@@ -33,17 +33,19 @@ jobs:
           pip install requests rich flake8 black
           pip install yt-dlp
 
-      - name: Lint with flake8
+      - name: Lint with flake8 (only critical errors)
         run: |
-          # 只檢查語法錯誤，風格警告不阻擋
           flake8 byse_full_suite/ --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 byse_full_suite/ --count --max-complexity=15 --max-line-length=120 --statistics || true
 
       - name: Check formatting with black
         run: |
-          black --check byse_full_suite/ || echo "black format warning"
+          black --check byse_full_suite/ || echo "black format warning - not blocking"
 
-      - name: Test SDK test_all (需要 BYSE_API_KEY)
+      - name: Compile check
+        run: |
+          python -m py_compile byse_full_suite/sdk.py byse_full_suite/cli.py byse_full_suite/downloader.py byse_uploader.py byse_full_suite/server.py
+
+      - name: Test SDK test_all (needs BYSE_API_KEY secret)
         if: ${{ secrets.BYSE_API_KEY != '' }}
         env:
           BYSE_API_KEY: ${{ secrets.BYSE_API_KEY }}
@@ -59,11 +61,10 @@ jobs:
           print('file/list:', sdk.file_list(per_page=1).get('status'))
           "
 
-      - name: Test SDK without key (public endpoints check)
+      - name: Test without key
         if: ${{ secrets.BYSE_API_KEY == '' }}
         run: |
-          echo "No BYSE_API_KEY secret set, skip private tests"
-          python -m py_compile byse_full_suite/sdk.py byse_full_suite/cli.py byse_full_suite/downloader.py byse_uploader.py
+          echo "No BYSE_API_KEY secret set, skip private tests - compile already OK"
 
   deploy-pages:
     name: Deploy Dashboard to GitHub Pages
@@ -81,10 +82,11 @@ jobs:
       - name: Prepare Pages artifact
         run: |
           mkdir -p _pages
-          cp -r byse_full_suite/dashboard.html _pages/index.html
+          cp byse_full_suite/dashboard.html _pages/index.html
           cp -r byse_full_suite _pages/
-          cp README.md _pages/
+          cp README.md _pages/README.md
           echo "<!-- Deployed at $(date) -->" >> _pages/index.html
+          ls -lh _pages/
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
@@ -93,23 +95,21 @@ jobs:
           publish_dir: ./_pages
           publish_branch: gh-pages
           commit_message: "docs: deploy dashboard to pages (auto)"
+          # 如果 gh-pages 第一次不存在，會自動建立
 
-  security-scan:
-    name: Secret Scan & CodeQL (light)
+  secret-scan:
+    name: Light Secret Scan
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: TruffleHog OSS - scan for secrets
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          base: main
-          head: HEAD
-          extra_args: --debug --only-verified || true
-      - name: Check no hardcoded keys
+      - name: Check no hardcoded API keys in source (exclude workflows)
         run: |
-          ! grep -R "LEAKED_BYSE_KEY" . --exclude-dir=.git || (echo "Found leaked Byse key!" && exit 1)
-          ! grep -R "ghp_" . --exclude-dir=.git --exclude-dir=.github || echo "Check ghp_ pattern (may be false positive)"
+          echo "Scanning for accidentally committed repo.json / .env ..."
+          ! test -f repo.json || (echo "repo.json Found! Should be gitignored" && exit 1)
+          ! test -f .env || (echo ".env Found!" && exit 1)
+          # 檢查是否有 ghp_ token 被誤推 (排除 .github 目錄本身的範例)
+          if grep -R --exclude-dir=.git --exclude-dir=.github -n "ghp_[A-Za-z0-9]\{20,\}" . ; then
+            echo "Possible GitHub token found in source!"
+            exit 1
+          fi
+          echo "Secret scan passed"
