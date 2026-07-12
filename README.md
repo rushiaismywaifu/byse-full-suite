@@ -94,3 +94,6 @@ python byse_uploader.py --key 你的KEY -f video.mp4
 ## 授權
 
 MIT
+
+### 快速下載
+- `python byse_full_suite/downloader.py https://bysedikamoum.com/download/CODE` 或加 `--use-ytdlp`
