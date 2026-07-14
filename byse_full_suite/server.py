@@ -58,7 +58,11 @@ ALLOWED_API_PATHS = {
 app = Flask(__name__, static_folder=".")
 # 不再允許任意 origin 帶 credentials; 預設限制為同源
 # 若需跨網域使用, 請明確設 BYSE_CORS_ORIGINS=https://yourdomain.com,https://another.com
-cors_origins = os.getenv("BYSE_CORS_ORIGINS", "*").split(",") if os.getenv("BYSE_CORS_ORIGINS") else "*"
+cors_origins = (
+    os.getenv("BYSE_CORS_ORIGINS", "*").split(",")
+    if os.getenv("BYSE_CORS_ORIGINS")
+    else "*"
+)
 CORS(app, origins=cors_origins, supports_credentials=False)
 
 
@@ -118,11 +122,18 @@ def proxy_api(path):
             # POST 時 form 也要清掉 key (由 server 注入)
             form = {k: v for k, v in request.form.to_dict().items() if k != "key"}
             form["key"] = api_key
-            r = requests.post(url, params=params, data=form, files=request.files, timeout=25)
+            r = requests.post(
+                url, params=params, data=form, files=request.files, timeout=25
+            )
+        # 嘗試回傳 JSON，失敗回原始
         try:
             return jsonify(r.json()), r.status_code
         except Exception:
-            return Response(r.text, status=r.status_code, mimetype=r.headers.get("Content-Type", "text/plain"))
+            return Response(
+                r.text,
+                status=r.status_code,
+                mimetype=r.headers.get("Content-Type", "text/plain"),
+            )
     except requests.RequestException as e:
         return jsonify({"error": f"upstream request failed: {e}"}), 502
     except Exception as e:
@@ -143,7 +154,9 @@ def proxy_upload():
         return jsonify({"error": "Server missing BYSE_API_KEY env var"}), 500
 
     try:
-        srv_resp = requests.get(f"{BASE_API}/upload/server", params={"key": api_key}, timeout=15)
+        srv_resp = requests.get(
+            f"{BASE_API}/upload/server", params={"key": api_key}, timeout=15
+        )
         srv_data = srv_resp.json()
         upload_url = srv_data.get("result")
         if not upload_url:

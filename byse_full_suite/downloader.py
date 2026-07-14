@@ -24,6 +24,7 @@ from typing import Optional
 # 嘗試載入 tqdm
 try:
     from tqdm import tqdm
+
     HAS_TQDM = True
 except:
     HAS_TQDM = False
@@ -34,33 +35,39 @@ DEFAULT_HEADERS = {
     "Accept": "*/*",
 }
 
-CODE_RE = re.compile(r'(?:/e/|/d/|/download/|/video/|/file/)?([a-zA-Z0-9]{8,12})(?:\.html|/|$)')
+CODE_RE = re.compile(
+    r"(?:/e/|/d/|/download/|/video/|/file/)?([a-zA-Z0-9]{8,12})(?:\.html|/|$)"
+)
+
 
 def extract_code(url_or_code: str) -> str:
     """從各種 byse 連結提取 filecode"""
     s = url_or_code.strip()
     # 如果本身就是 8-12 碼純碼
-    if re.fullmatch(r'[A-Za-z0-9]{8,12}', s):
+    if re.fullmatch(r"[A-Za-z0-9]{8,12}", s):
         return s
     m = CODE_RE.search(s)
     if m:
         return m.group(1)
     # 嘗試最後一段
-    m2 = re.search(r'([A-Za-z0-9]{8,12})', s)
+    m2 = re.search(r"([A-Za-z0-9]{8,12})", s)
     if m2:
         return m2.group(1)
     raise ValueError(f"無法從 {url_or_code} 提取 filecode")
+
 
 def guess_domain(url: str) -> str:
     """從輸入 URL 保留原始域名，例如 bysedikamoum.com"""
     try:
         from urllib.parse import urlparse
+
         p = urlparse(url)
         if p.netloc:
             return p.netloc
     except:
         pass
     return "byse.sx"
+
 
 def build_urls(filecode: str, original_domain: str = "byse.sx"):
     """產生幾種可能的直鏈"""
@@ -73,6 +80,7 @@ def build_urls(filecode: str, original_domain: str = "byse.sx"):
         f"https://filemoon.to/d/{filecode}",
         f"https://{original_domain}/e/{filecode}",
     ]
+
 
 def download_with_requests(url: str, output: Path, headers: dict = None):
     """串流下載帶進度"""
@@ -102,19 +110,23 @@ def download_with_requests(url: str, output: Path, headers: dict = None):
                 print(f"[+] 找到 download 按鈕連結: {real_url}")
                 return download_with_requests(real_url, output, headers)
             # 否則還是把 HTML 存下來供除錯
-            print(f"[!] 回傳是 HTML ({ctype}), 可能需要等待或過廣告, 先存成 {output}.html 供檢查")
-            output.with_suffix(".html").write_text(text, encoding="utf-8", errors="ignore")
+            print(
+                f"[!] 回傳是 HTML ({ctype}), 可能需要等待或過廣告, 先存成 {output}.html 供檢查"
+            )
+            output.with_suffix(".html").write_text(
+                text, encoding="utf-8", errors="ignore"
+            )
             raise RuntimeError("拿到的是 HTML 頁面，不是影片本身。建議改用 --use-ytdlp")
 
         output.parent.mkdir(parents=True, exist_ok=True)
         if HAS_TQDM and total:
-            pbar = tqdm(total=total, unit='B', unit_scale=True, desc=output.name)
+            pbar = tqdm(total=total, unit="B", unit_scale=True, desc=output.name)
         else:
             pbar = None
             print(f"[+] 下載 {output.name} {(total/1024/1024):.2f}MB")
 
-        with open(output, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=1024*256):
+        with open(output, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024 * 256):
                 if chunk:
                     f.write(chunk)
                     if pbar:
@@ -123,9 +135,11 @@ def download_with_requests(url: str, output: Path, headers: dict = None):
             pbar.close()
     print(f"[✓] 完成: {output} ({output.stat().st_size/1024/1024:.2f} MB)")
 
+
 def download_with_api(filecode: str, api_key: str, output: Path):
     """用你自己的 byse API Key 下載自己帳號的檔案 (最穩定)"""
     from sdk import ByseSDK
+
     sdk = ByseSDK(api_key)
     info = sdk.file_info(filecode)
     print(info)
@@ -142,6 +156,7 @@ def download_with_api(filecode: str, api_key: str, output: Path):
         return download_with_requests(direct_page, output)
     else:
         raise RuntimeError(f"API 未回傳 link: {info}")
+
 
 def download_with_ytdlp(url_or_code: str, output: str = None):
     """呼叫 yt-dlp，最能處理 HLS / 打包 JS，推薦"""
@@ -179,13 +194,24 @@ def download_with_ytdlp(url_or_code: str, output: str = None):
                 print(f"  失敗: {e}")
         raise last_err
 
+
 def main():
     parser = argparse.ArgumentParser(description="Byse.sx 快速下載器")
-    parser.add_argument("url", help="byse 連結，例如 https://bysedikamoum.com/download/20qj5ubmhhsj 或 filecode")
+    parser.add_argument(
+        "url",
+        help="byse 連結，例如 https://bysedikamoum.com/download/20qj5ubmhhsj 或 filecode",
+    )
     parser.add_argument("-o", "--output", help="輸出檔名，預設 filecode.mp4")
     parser.add_argument("--code", action="store_true", help="強制把第一參數當 filecode")
-    parser.add_argument("--api-key", help="若是下載自己帳號的檔案，提供 API Key 用官方 file/info 取直鏈 (最穩定)")
-    parser.add_argument("--use-ytdlp", action="store_true", help="使用 yt-dlp 解析 HLS (推薦處理廣告/打包JS)")
+    parser.add_argument(
+        "--api-key",
+        help="若是下載自己帳號的檔案，提供 API Key 用官方 file/info 取直鏈 (最穩定)",
+    )
+    parser.add_argument(
+        "--use-ytdlp",
+        action="store_true",
+        help="使用 yt-dlp 解析 HLS (推薦處理廣告/打包JS)",
+    )
     parser.add_argument("--domain", help="自訂域名，預設自動從 URL 判斷")
     args = parser.parse_args()
 
@@ -226,8 +252,13 @@ def main():
             print(f"  -> 失敗: {e}")
             continue
 
-    print("\n[✗] 所有直鏈都失敗，建議改用 --use-ytdlp，這對 byse/filemoon 的 HLS 打包最有效")
-    print("    pip install yt-dlp && python downloader.py --use-ytdlp https://bysedikamoum.com/e/20qj5ubmhhsj")
+    print(
+        "\n[✗] 所有直鏈都失敗，建議改用 --use-ytdlp，這對 byse/filemoon 的 HLS 打包最有效"
+    )
+    print(
+        "    pip install yt-dlp && python downloader.py --use-ytdlp https://bysedikamoum.com/e/20qj5ubmhhsj"
+    )
+
 
 if __name__ == "__main__":
     main()
