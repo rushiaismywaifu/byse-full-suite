@@ -148,44 +148,37 @@ class ByseClient:
 
         # 官方要求 POST 到 upload server，參數 key + file
         # 有些舊文件說要帶 fld_id，這裡一併支援
-        files = {
-            'file': (path.name, open(path, 'rb'), mimetypes.guess_type(str(path))[0] or 'video/mp4')
-        }
         data = {'key': self.api_key}
         if folder_id is not None:
             data['fld_id'] = str(folder_id)
 
         # 進度條處理：requests 不內建，簡單用檔案大小估
-        # 若有 tqdm，我們手動包裝
+        # 若有 tqdm，我們手動包裝 ProgressFile
+        # 重要: 使用 with 確保 file handle 一定被關閉, 避免 fd 洩漏
+        class ProgressFile:
+            def __init__(self, f, pbar):
+                self.f = f
+                self.pbar = pbar
+            def read(self, size=-1):
+                chunk = self.f.read(size)
+                if chunk:
+                    self.pbar.update(len(chunk))
+                return chunk
+            def __getattr__(self, attr):
+                return getattr(self.f, attr)
+
         try:
+            mime = mimetypes.guess_type(str(path))[0] or 'video/mp4'
             if HAS_TQDM:
                 file_size = path.stat().st_size
-                with tqdm(total=file_size, unit='B', unit_scale=True, desc=path.name) as pbar:
-                    # 自訂一個迭代器來更新進度
-                    class ProgressFile:
-                        def __init__(self, f, pbar):
-                            self.f = f
-                            self.pbar = pbar
-                        def read(self, size=-1):
-                            chunk = self.f.read(size)
-                            if chunk:
-                                self.pbar.update(len(chunk))
-                            return chunk
-                        def __getattr__(self, attr):
-                            return getattr(self.f, attr)
-
-                    with open(path, 'rb') as f:
-                        files = {'file': (path.name, ProgressFile(f, pbar), mimetypes.guess_type(str(path))[0] or 'video/mp4')}
-                        resp = self.session.post(upload_url, data=data, files=files, timeout=300)
+                with tqdm(total=file_size, unit='B', unit_scale=True, desc=path.name) as pbar, \
+                     open(path, 'rb') as f:
+                    files = {'file': (path.name, ProgressFile(f, pbar), mime)}
+                    resp = self.session.post(upload_url, data=data, files=files, timeout=300)
             else:
-                resp = self.session.post(upload_url, data=data, files=files, timeout=300)
-
-            # 關閉之前打開的 file handle (tqdm 分支已經在 with 內關了)
-            if 'file' in files:
-                try:
-                    files['file'][1].close()
-                except Exception:
-                    pass
+                with open(path, 'rb') as f:
+                    files = {'file': (path.name, f, mime)}
+                    resp = self.session.post(upload_url, data=data, files=files, timeout=300)
 
             try:
                 j = resp.json()

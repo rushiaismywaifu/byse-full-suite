@@ -77,13 +77,29 @@ python byse_full_suite/cli.py
 python byse_full_suite/cli.py --non-interactive
 ```
 
-### 3. Web Dashboard
+### 3. Web Dashboard (推薦透過 server.py 啟用, 安全)
 
 ```bash
+# 安全模式 (推薦): API Key 從環境變數注入, 不暴露在前端
+export BYSE_API_KEY=你的KEY
+cd byse_full_suite
+pip install flask flask-cors requests
+python server.py
+# 打開 http://127.0.0.1:5000/
+
+# 離線模式 (不建議, Key 會存 localStorage 並以 query 帶出)
 cd byse_full_suite
 python -m http.server 8000
 # 打開 http://localhost:8000/dashboard.html
 ```
+
+server.py 安全設定 (環境變數):
+- `BYSE_API_KEY` (必填): 由 server 注入, 前端永遠看不到
+- `BYSE_PROXY_TOKEN` (可選): 啟用 Bearer token 認證
+- `BYSE_CORS_ORIGINS` (可選): 限制跨網域白名單, 逗號分隔
+- `BYSE_HOST` (預設 127.0.0.1): 綁定介面
+- `BYSE_PORT` (預設 5000): 監聽 port
+- `BYSE_DEBUG=1` (預設關): 開啟 Flask debug, 嚴禁生產環境使用
 
 ### 4. 輕量上傳
 
