@@ -42,9 +42,7 @@ except ImportError:
 
 DEFAULT_BASE_NEW = "https://api.byse.sx"
 DEFAULT_BASE_LEGACY = "https://filemoonapi.com/api"
-DEFAULT_PLAYER_BASE = (
-    "https://byse.sx/e/"  # 用於拼接播放頁，實際 embed domain 每個帳號不同
-)
+DEFAULT_PLAYER_BASE = "https://byse.sx/e/"  # 用於拼接播放頁，實際 embed domain 每個帳號不同
 
 # 引入完整 SDK (避免重複實作)
 try:
@@ -135,19 +133,15 @@ class ByseClient:
             mime = mimetypes.guess_type(str(path))[0] or "video/mp4"
             if HAS_TQDM:
                 file_size = path.stat().st_size
-                with tqdm(
-                    total=file_size, unit="B", unit_scale=True, desc=path.name
-                ) as pbar, open(path, "rb") as f:
+                with tqdm(total=file_size, unit="B", unit_scale=True, desc=path.name) as pbar, open(
+                    path, "rb"
+                ) as f:
                     files = {"file": (path.name, ProgressFile(f, pbar), mime)}
-                    resp = self.session.post(
-                        upload_url, data=data, files=files, timeout=300
-                    )
+                    resp = self.session.post(upload_url, data=data, files=files, timeout=300)
             else:
                 with open(path, "rb") as f:
                     files = {"file": (path.name, f, mime)}
-                    resp = self.session.post(
-                        upload_url, data=data, files=files, timeout=300
-                    )
+                    resp = self.session.post(upload_url, data=data, files=files, timeout=300)
 
             try:
                 j = resp.json()
@@ -304,9 +298,7 @@ def main():
     )
     parser.add_argument("--key", help="API Key (或設環境變數 BYSE_API_KEY)")
     parser.add_argument("-f", "--file", nargs="+", help="本地影片檔案路徑 (可多檔)")
-    parser.add_argument(
-        "--url", nargs="+", help="遠端直鏈 URL (可多個，進行 remote upload)"
-    )
+    parser.add_argument("--url", nargs="+", help="遠端直鏈 URL (可多個，進行 remote upload)")
     parser.add_argument(
         "--folder-id", type=int, default=None, help="上傳到指定資料夾 ID，預設 0 根目錄"
     )
@@ -368,18 +360,10 @@ def main():
         print(json.dumps(client.encoding_list(), indent=2, ensure_ascii=False))
         return
     if args.command == "enc-status":
-        print(
-            json.dumps(
-                client.encoding_status(args.filecode), indent=2, ensure_ascii=False
-            )
-        )
+        print(json.dumps(client.encoding_status(args.filecode), indent=2, ensure_ascii=False))
         return
     if args.command == "remote-status":
-        print(
-            json.dumps(
-                client.remote_upload_status(args.filecode), indent=2, ensure_ascii=False
-            )
-        )
+        print(json.dumps(client.remote_upload_status(args.filecode), indent=2, ensure_ascii=False))
         return
 
     # 預設行為: 上傳
@@ -414,9 +398,7 @@ def main():
                     for _ in range(12):
                         time.sleep(5)
                         st = client.remote_upload_status(filecode)
-                        print(
-                            f"    狀態: {json.dumps(st.get('result', st), ensure_ascii=False)}"
-                        )
+                        print(f"    狀態: {json.dumps(st.get('result', st), ensure_ascii=False)}")
                         r = st.get("result", {})
                         if isinstance(r, dict) and r.get("status") in (
                             "DONE",

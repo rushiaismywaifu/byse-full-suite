@@ -27,9 +27,7 @@ LEGACY_BASE = "https://filemoonapi.com/api"
 class ByseAPIError(Exception):
     """Byse API 錯誤, 帶 status_code 與原始回應方便除錯"""
 
-    def __init__(
-        self, message: str, status_code: Optional[int] = None, response: Any = None
-    ):
+    def __init__(self, message: str, status_code: Optional[int] = None, response: Any = None):
         super().__init__(message)
         self.status_code = status_code
         self.response = response
@@ -105,9 +103,7 @@ class ByseSDK:
         if not allow_400 and data.get("status") == 400:
             msg = data.get("msg", "")
             if msg in ("Invalid operation", "Wrong Auth"):
-                raise ByseAPIError(
-                    f"{path} {msg}: {data}", status_code=400, response=data
-                )
+                raise ByseAPIError(f"{path} {msg}: {data}", status_code=400, response=data)
 
         return data
 
@@ -163,9 +159,7 @@ class ByseSDK:
         with open(filepath, "rb") as f:
             files = {"file": (filepath.name, f, mime)}
             try:
-                r = self.session.post(
-                    upload_server_url, data=extra_data, files=files, timeout=300
-                )
+                r = self.session.post(upload_server_url, data=extra_data, files=files, timeout=300)
             except requests.RequestException as e:
                 raise ByseAPIError(f"上傳請求失敗: {e}")
             try:
@@ -196,9 +190,14 @@ class ByseSDK:
         ]
         try:
             return self._get_with_fallback("embed_domains", candidates)
-        except ByseAPIError:
+        except ByseAPIError as e:
+            # 401 Wrong Auth 應直接往上傳 (key 錯了試其他端點也沒用)
+            if e.status_code == 401:
+                raise
             raise ByseAPIError(
-                "embed_domains 端點不存在，請到後台 Settings -> Custom Domains 查看"
+                "embed_domains 端點不存在，請到後台 Settings -> Custom Domains 查看",
+                status_code=e.status_code,
+                response=e.response,
             )
 
     # ========== 2. Upload 群組 ==========
@@ -210,9 +209,7 @@ class ByseSDK:
             raise ByseAPIError(f"無法取得上傳伺服器: {data}")
         return result
 
-    def upload_file(
-        self, filepath: Union[str, Path], folder_id: Optional[int] = None
-    ) -> Dict:
+    def upload_file(self, filepath: Union[str, Path], folder_id: Optional[int] = None) -> Dict:
         """本地檔案上傳：先拿 server 再 POST"""
         fp = Path(filepath)
         if not fp.exists():
@@ -232,9 +229,7 @@ class ByseSDK:
         if folder_id is not None:
             params["fld_id"] = folder_id
         candidates = ["remote/add", "upload/url"]
-        return self._get_with_fallback(
-            "remote_upload", candidates, params=params, allow_400=True
-        )
+        return self._get_with_fallback("remote_upload", candidates, params=params, allow_400=True)
 
     def remote_remove(self, file_code: str) -> Dict:
         """移除佇列中的遠端上傳"""
@@ -399,9 +394,7 @@ class ByseSDK:
             "account/hls",
         ]
         try:
-            return self._get_with_fallback(
-                "premium_hls", candidates, params=params, allow_400=True
-            )
+            return self._get_with_fallback("premium_hls", candidates, params=params, allow_400=True)
         except ByseAPIError:
             raise ByseAPIError("premium HLS 端點暫不可用或帳號未開通 premium")
 
@@ -416,9 +409,7 @@ class ByseSDK:
         base = f"https://{domain}/e/{file_code}"
         if not custom_params:
             return base
-        qs = "&".join(
-            [f"{k}={quote(str(v), safe='')}" for k, v in custom_params.items()]
-        )
+        qs = "&".join([f"{k}={quote(str(v), safe='')}" for k, v in custom_params.items()])
         return f"{base}?{qs}" if qs else base
 
     @staticmethod

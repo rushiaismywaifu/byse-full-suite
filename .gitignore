@@ -7,7 +7,10 @@ byse_key.txt
 *.key
 __pycache__/
 *.pyc
+*.pyo
 .venv/
+venv/
+env/
 node_modules/
 .DS_Store
 ui_shigure.mkv
@@ -19,3 +22,16 @@ ui_shigure.mkv
 # 本地測試檔案
 test_upload/
 uploads/
+
+# 建構產物
+build/
+dist/
+*.egg-info/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+

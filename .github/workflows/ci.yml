@@ -2,9 +2,9 @@ name: Byse CI & Pages
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   schedule:
     # 每天 09:00 UTC = 17:00 台北，檢查 byse.sx API 是否還活著
     - cron: '0 9 * * *'
@@ -29,39 +29,42 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install requests rich flake8 black yt-dlp
+          pip install -r requirements-dev.txt
 
-      - name: Lint with flake8 (only critical errors)
+      - name: Lint with flake8 (critical errors, 全專案)
         run: |
-          flake8 byse_full_suite/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # 包含根目錄 byse_uploader.py, 不再漏掉
+          flake8 byse_full_suite/ byse_uploader.py tests/ scripts/ \
+            --count --select=E9,F63,F7,F82 --show-source --statistics
 
-      - name: Check formatting with black
+      - name: Check formatting with black (blocking)
         run: |
-          black --check byse_full_suite/ || echo "black format warning - not blocking"
+          black --check byse_full_suite/ byse_uploader.py tests/ scripts/
 
       - name: Compile check
         run: |
-          python -m py_compile byse_full_suite/sdk.py byse_full_suite/cli.py byse_full_suite/downloader.py byse_uploader.py byse_full_suite/server.py
+          python -m py_compile \
+            byse_full_suite/sdk.py \
+            byse_full_suite/cli.py \
+            byse_full_suite/downloader.py \
+            byse_full_suite/server.py \
+            byse_uploader.py \
+            scripts/health_check.py
 
-      - name: Test SDK (with BYSE_API_KEY if provided)
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v --tb=short
+
+      - name: Live API test (with BYSE_API_KEY if provided)
         env:
           BYSE_API_KEY: ${{ secrets.BYSE_API_KEY }}
         run: |
           if [ -z "$BYSE_API_KEY" ]; then
-            echo "No BYSE_API_KEY secret set, skip private tests - compile already OK"
+            echo "No BYSE_API_KEY secret set, skip live tests (unit tests already passed)"
             exit 0
           fi
-          echo "BYSE_API_KEY is set, running private tests..."
+          echo "BYSE_API_KEY is set, running live tests..."
           python byse_full_suite/cli.py --non-interactive
-          python -c "
-          from byse_full_suite.sdk import ByseSDK
-          import os
-          key=os.getenv('BYSE_API_KEY')
-          sdk=ByseSDK(key)
-          print('account/info:', sdk.account_info().get('status'))
-          print('upload/server:', sdk.upload_server())
-          print('file/list:', sdk.file_list(per_page=1).get('status'))
-          "
 
   deploy-pages:
     name: Deploy Dashboard to GitHub Pages

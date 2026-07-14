@@ -35,9 +35,7 @@ DEFAULT_HEADERS = {
     "Accept": "*/*",
 }
 
-CODE_RE = re.compile(
-    r"(?:/e/|/d/|/download/|/video/|/file/)?([a-zA-Z0-9]{8,12})(?:\.html|/|$)"
-)
+CODE_RE = re.compile(r"(?:/e/|/d/|/download/|/video/|/file/)?([a-zA-Z0-9]{8,12})(?:\.html|/|$)")
 
 
 def extract_code(url_or_code: str) -> str:
@@ -110,12 +108,8 @@ def download_with_requests(url: str, output: Path, headers: dict = None):
                 print(f"[+] 找到 download 按鈕連結: {real_url}")
                 return download_with_requests(real_url, output, headers)
             # 否則還是把 HTML 存下來供除錯
-            print(
-                f"[!] 回傳是 HTML ({ctype}), 可能需要等待或過廣告, 先存成 {output}.html 供檢查"
-            )
-            output.with_suffix(".html").write_text(
-                text, encoding="utf-8", errors="ignore"
-            )
+            print(f"[!] 回傳是 HTML ({ctype}), 可能需要等待或過廣告, 先存成 {output}.html 供檢查")
+            output.with_suffix(".html").write_text(text, encoding="utf-8", errors="ignore")
             raise RuntimeError("拿到的是 HTML 頁面，不是影片本身。建議改用 --use-ytdlp")
 
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -252,9 +246,7 @@ def main():
             print(f"  -> 失敗: {e}")
             continue
 
-    print(
-        "\n[✗] 所有直鏈都失敗，建議改用 --use-ytdlp，這對 byse/filemoon 的 HLS 打包最有效"
-    )
+    print("\n[✗] 所有直鏈都失敗，建議改用 --use-ytdlp，這對 byse/filemoon 的 HLS 打包最有效")
     print(
         "    pip install yt-dlp && python downloader.py --use-ytdlp https://bysedikamoum.com/e/20qj5ubmhhsj"
     )

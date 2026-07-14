@@ -64,9 +64,7 @@ def proxy_upload():
 
     # 先取得 upload server
     try:
-        srv_resp = requests.get(
-            f"{BASE_API}/upload/server", params={"key": api_key}, timeout=15
-        )
+        srv_resp = requests.get(f"{BASE_API}/upload/server", params={"key": api_key}, timeout=15)
         srv_data = srv_resp.json()
         upload_url = srv_data.get("result")
         if not upload_url:

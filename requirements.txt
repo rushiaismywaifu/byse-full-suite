@@ -1,0 +1,13 @@
+# 核心依賴 (SDK + Uploader + Downloader 必用)
+requests>=2.25
+tqdm>=4.60
+
+# CLI 互動介面 (推薦)
+rich>=12.0
+
+# yt-dlp 下載器 (downloader.py --use-ytdlp)
+yt-dlp>=2023.0
+
+# Flask 代理伺服器 (server.py, 推薦用於 dashboard 安全模式)
+flask>=2.0
+flask-cors>=3.0
