@@ -1,0 +1,8 @@
+# 開發用依賴
+-r requirements.txt
+
+pytest>=7.0
+pytest-cov>=4.0
+flake8>=6.0
+black>=23.0
+requests-mock>=1.10

@@ -23,26 +23,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Build package (zip)
+      - name: Install build tools
         run: |
+          python -m pip install --upgrade pip
           pip install build
-          if [ ! -f pyproject.toml ]; then
-          cat > pyproject.toml << 'PYTOML'
-          [build-system]
-          requires = ["setuptools>=61.0"]
-          build-backend = "setuptools.build_meta"
-          [project]
-          name = "byse-full-suite"
-          version = "2.0.0"
-          description = "Byse.sx / Filemoon 完整 API SDK + CLI + Dashboard + Downloader"
-          readme = "README.md"
-          requires-python = ">=3.8"
-          dependencies = ["requests","tqdm"]
-          [project.optional-dependencies]
-          rich = ["rich"]
-          ytdlp = ["yt-dlp"]
-          PYTOML
-          fi
+
+      - name: Build package (使用專案內 pyproject.toml)
+        run: |
+          # pyproject.toml 已存在於專案根目錄, 不再臨時生成
+          test -f pyproject.toml || { echo "ERROR: pyproject.toml missing"; exit 1; }
           python -m build
           ls -lh dist/
 

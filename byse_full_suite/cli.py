@@ -100,9 +100,7 @@ def menu_account(sdk: ByseSDK):
         print("\n[Embed Domains]")
         print_json(domains)
     except Exception as e:
-        print(
-            f"embed domains 不可用: {e} (請到網頁後台 Settings -> Custom Domains 查看)"
-        )
+        print(f"embed domains 不可用: {e} (請到網頁後台 Settings -> Custom Domains 查看)")
 
 
 def menu_files(sdk: ByseSDK):
@@ -207,8 +205,7 @@ def menu_files(sdk: ByseSDK):
         elif choice == "8":
             code = input("filecode: ").strip()
             domain = (
-                input("embed domain (預設 byse.sx，建議填你後台專屬域名): ").strip()
-                or "byse.sx"
+                input("embed domain (預設 byse.sx，建議填你後台專屬域名): ").strip() or "byse.sx"
             )
             # 字幕
             subs = []
@@ -224,9 +221,7 @@ def menu_files(sdk: ByseSDK):
             embed_url = sdk.build_embed_with_extras(
                 code, domain, subtitles=subs or None, poster=poster, logo=logo
             )
-            iframe = sdk.iframe_code(
-                code, domain, subtitles=subs or None, poster=poster, logo=logo
-            )
+            iframe = sdk.iframe_code(code, domain, subtitles=subs or None, poster=poster, logo=logo)
             print(f"\nEmbed URL:\n{embed_url}\n\nIframe:\n{iframe}\n")
 
         elif choice == "9":
@@ -286,9 +281,7 @@ def menu_upload(sdk: ByseSDK):
                 print(f"上傳失敗: {e}")
 
         elif c == "2":
-            paths = (
-                input("多檔路徑，用空格或逗號分隔: ").strip().replace(",", " ").split()
-            )
+            paths = input("多檔路徑，用空格或逗號分隔: ").strip().replace(",", " ").split()
             fld = input("資料夾ID: ").strip()
             fld_id = int(fld) if fld else None
             for p in paths:
@@ -349,9 +342,7 @@ def menu_upload(sdk: ByseSDK):
 def menu_encoding(sdk: ByseSDK):
     while True:
         print("\n=== 編碼監控 ===")
-        print(
-            "1. 列出所有編碼任務  2. 單檔編碼狀態  3. 重啟錯誤編碼  4. 刪除錯誤編碼  5. 返回"
-        )
+        print("1. 列出所有編碼任務  2. 單檔編碼狀態  3. 重啟錯誤編碼  4. 刪除錯誤編碼  5. 返回")
         c = input("選項: ").strip()
         if c == "1":
             try:
@@ -460,9 +451,7 @@ def main():
 
     while True:
         print("\n========== 主選單 ==========")
-        print(
-            "1. 帳號總覽  2. 檔案管理  3. 資料夾  4. 上傳中心  5. 編碼監控  6. 工具箱  0. 離開"
-        )
+        print("1. 帳號總覽  2. 檔案管理  3. 資料夾  4. 上傳中心  5. 編碼監控  6. 工具箱  0. 離開")
         choice = input("請選擇: ").strip()
         if choice == "1":
             menu_account(sdk)
