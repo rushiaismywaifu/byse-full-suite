@@ -45,14 +45,9 @@ code{background:#1a2336;padding:2px 6px;border-radius:6px;font-size:12px;word-br
 <body>
 <header>
 <h1>Byse Full Suite</h1>
-<input id="apiKey" type="text" placeholder="輸入 API Key (請輸入你的 API Key)"/>
-<select id="baseUrl">
-<option value="https://api.byse.sx" selected>https://api.byse.sx (新版可用)</option>
-<option value="https://filemoonapi.com/api">https://filemoonapi.com/api (舊版 522)</option>
-</select>
-<button onclick="saveConfig()">儲存</button>
+<span class="muted" id="keyStatus">檢測代理狀態中...</span>
 <button class="secondary" onclick="testAll()">測試所有端點</button>
-<span class="muted">12群組 29+端點 | 來源 byse.sx/api-docs</span>
+<span class="muted">12群組 29+端點 | 透過 server.py 代理 (API Key 不再暴露於前端)</span>
 </header>
 
 <nav>
@@ -190,34 +185,63 @@ code{background:#1a2336;padding:2px 6px;border-radius:6px;font-size:12px;word-br
 </main>
 
 <script>
-let API_KEY = localStorage.getItem('byse_api_key') || '';
-let BASE_URL = localStorage.getItem('byse_base') || 'https://api.byse.sx';
-document.getElementById('apiKey').value = API_KEY;
-document.getElementById('baseUrl').value = BASE_URL;
+// === 安全模式: 透過 server.py 代理, API Key 不再寫入前端 ===
+// 所有請求打到同源 /api/<path>, server 從環境變數注入 key
+// 若直接開 dashboard.html (沒走 server.py), 會自動 fallback 提示
+let USE_PROXY = true;  // 預設走代理
+let API_KEY_FALLBACK = localStorage.getItem('byse_api_key') || '';  // 僅離線模式用
+let BASE_URL_FALLBACK = 'https://api.byse.sx';
 
-function saveConfig(){
-  API_KEY = document.getElementById('apiKey').value.trim();
-  BASE_URL = document.getElementById('baseUrl').value.trim();
-  localStorage.setItem('byse_api_key', API_KEY);
-  localStorage.setItem('byse_base', BASE_URL);
-  alert('已儲存');
+async function checkProxyMode(){
+  // 探測當前是否透過 server.py 開啟 (嘗試打 /api/account/info 看 401/403/500 而非 404)
+  try{
+    const r = await fetch('/api/account/info', {method:'GET'});
+    USE_PROXY = r.status !== 404;
+  }catch(e){
+    USE_PROXY = false;
+  }
+  const statusEl = document.getElementById('keyStatus');
+  if(USE_PROXY){
+    statusEl.textContent = '✓ 代理模式 (API Key 由 server 注入)';
+    statusEl.style.color = '#4ade80';
+  }else{
+    statusEl.textContent = '⚠ 離線模式 (建議改用 python server.py 啟用代理)';
+    statusEl.style.color = '#fbbf24';
+    // 離線 fallback: 顯示 key 輸入框
+    const k = prompt('未偵測到 server.py 代理。\n若要繼續使用離線模式, 請輸入 API Key (將暫存於 localStorage):', API_KEY_FALLBACK);
+    if(k){
+      API_KEY_FALLBACK = k.trim();
+      localStorage.setItem('byse_api_key', API_KEY_FALLBACK);
+    }
+  }
 }
 
-function apiUrl(path, params={}){
-  params.key = API_KEY;
-  const qs = new URLSearchParams(params).toString();
-  return `${BASE_URL.replace(/\/$/,'')}/${path.replace(/^\//,'')}?${qs}`;
+function buildUrl(path, params={}){
+  if(USE_PROXY){
+    // 代理模式: 不帶 key (server 端注入)
+    const clean = {...params};
+    delete clean.key;
+    const qs = new URLSearchParams(clean).toString();
+    return `/api/${path.replace(/^\//,'')}${qs ? '?'+qs : ''}`;
+  }else{
+    // 離線模式: 直接打 byse API (key 帶 query, 僅供本機測試)
+    const p = {...params, key: API_KEY_FALLBACK};
+    const qs = new URLSearchParams(p).toString();
+    return `${BASE_URL_FALLBACK}/${path.replace(/^\//,'')}?${qs}`;
+  }
 }
 
 async function fetchJson(path, params={}, allow400=false){
-  if(!API_KEY) throw new Error('請先輸入 API Key');
-  const url = apiUrl(path, params);
+  if(!USE_PROXY && !API_KEY_FALLBACK){
+    throw new Error('離線模式需設定 API Key (請重新整理頁面輸入)');
+  }
+  const url = buildUrl(path, params);
   const r = await fetch(url);
   const text = await r.text();
   try{
     const j = JSON.parse(text);
     if(!allow400 && j.status==400 && j.msg=='Invalid operation') throw new Error(`Invalid operation: ${path}`);
-    if(j.msg=='Wrong Auth') throw new Error('Wrong Auth - API Key 錯誤');
+    if(j.msg=='Wrong Auth') throw new Error('Wrong Auth - API Key 錯誤或 server 未設 BYSE_API_KEY');
     return j;
   }catch(e){
     if(text.includes('Page not found')) throw new Error(`${path} 404 前端`);
@@ -390,17 +414,19 @@ async function uploadLocalFiles(){
   const fld=document.getElementById('uploadFolderId').value||0;
   const log=document.getElementById('uploadProgress');
   if(!input.files.length) return alert('選檔案');
-  log.textContent='取得上傳伺服器...\n';
+  log.textContent = USE_PROXY ? '透過 /upload 代理上傳...\n' : '取得上傳伺服器...\n';
   try{
-    const server = await getUploadServer();
-    log.textContent+=`Server: ${server}\n`;
+    const server = USE_PROXY ? null : await getUploadServer();
+    if(server) log.textContent+=`Server: ${server}\n`;
     for(const file of input.files){
       log.textContent+=`\n上傳 ${file.name} (${(file.size/1024/1024).toFixed(2)}MB)...\n`;
       const form=new FormData();
-      form.append('key', API_KEY);
+      // 代理模式: 不帶 key (server 端注入); 離線模式: 帶 key
+      if(!USE_PROXY) form.append('key', API_KEY_FALLBACK);
       form.append('file', file);
       if(fld!=0) form.append('fld_id', fld);
-      const resp=await fetch(server, {method:'POST', body:form});
+      const uploadTarget = USE_PROXY ? '/upload' : server;
+      const resp=await fetch(uploadTarget, {method:'POST', body:form});
       const text=await resp.text();
       log.textContent+=`回應: ${text.slice(0,2000)}\n`;
       try{
@@ -534,8 +560,14 @@ window.addEventListener('message', (event)=>{
 });
 
 // init
-if(API_KEY) { loadAccountInfo(); }
+(async function init(){
+  await checkProxyMode();
+  // 若代理模式且 server 已設 key, 或離線模式且有 fallback key, 就自動載入
+  if(USE_PROXY || API_KEY_FALLBACK){
+    loadAccountInfo();
+  }
+})();
 </script>
 </body>
 </html>
-<!-- Deployed at Mon Jul 13 12:12:51 UTC 2026 -->
+<!-- Deployed at Tue Jul 14 07:04:00 UTC 2026 -->
