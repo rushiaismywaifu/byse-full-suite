@@ -20,11 +20,13 @@ UPLOAD_SERVER_CACHE = {}
 app = Flask(__name__, static_folder=".")
 CORS(app, supports_credentials=True)
 
+
 @app.route("/")
 def index():
     return send_from_directory(".", "dashboard.html")
 
-@app.route("/api/<path:path>", methods=["GET","POST"])
+
+@app.route("/api/<path:path>", methods=["GET", "POST"])
 def proxy_api(path):
     """代理所有 /api/xxx 到 https://api.byse.sx/xxx"""
     params = request.args.to_dict()
@@ -34,14 +36,21 @@ def proxy_api(path):
         if request.method == "GET":
             r = requests.get(url, params=params, timeout=25)
         else:
-            r = requests.post(url, params=params, data=request.form, files=request.files, timeout=25)
+            r = requests.post(
+                url, params=params, data=request.form, files=request.files, timeout=25
+            )
         # 嘗試回傳 JSON，失敗回原始
         try:
             return jsonify(r.json()), r.status_code
         except:
-            return Response(r.text, status=r.status_code, mimetype=r.headers.get("Content-Type","text/plain"))
+            return Response(
+                r.text,
+                status=r.status_code,
+                mimetype=r.headers.get("Content-Type", "text/plain"),
+            )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/upload", methods=["POST"])
 def proxy_upload():
@@ -55,7 +64,9 @@ def proxy_upload():
 
     # 先取得 upload server
     try:
-        srv_resp = requests.get(f"{BASE_API}/upload/server", params={"key": api_key}, timeout=15)
+        srv_resp = requests.get(
+            f"{BASE_API}/upload/server", params={"key": api_key}, timeout=15
+        )
         srv_data = srv_resp.json()
         upload_url = srv_data.get("result")
         if not upload_url:
@@ -83,9 +94,11 @@ def proxy_upload():
     except Exception as e:
         return jsonify({"error": f"upload fail: {e}"}), 500
 
+
 @app.route("/dashboard.html")
 def dash():
     return send_from_directory(".", "dashboard.html")
+
 
 if __name__ == "__main__":
     print("Byse Full Suite Server")
