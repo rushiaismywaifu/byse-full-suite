@@ -16,7 +16,7 @@ from typing import List, Tuple
 
 import requests
 
-BASES = ["https://api.byse.sx", "https://filemoonapi.com/api"]
+BASES = ["https://api.byse.sx"]
 PUBLIC_ENDPOINTS = ["account/info", "upload/server"]
 AUTHED_ENDPOINTS = ["account/info", "upload/server", "file/list", "folder/list", "encoding/list"]
 
