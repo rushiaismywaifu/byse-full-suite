@@ -55,6 +55,29 @@ jobs:
         run: |
           pytest tests/ -v --tb=short
 
+      - name: Install dashboard browser test dependencies
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Test dashboard interactions and responsive layouts
+        env:
+          BYSE_API_KEY: ''
+          BYSE_PROXY_TOKEN: ''
+          BYSE_HOST: '127.0.0.1'
+          BYSE_PORT: '5000'
+        run: |
+          python byse_full_suite/server.py > /tmp/byse-dashboard-server.log 2>&1 &
+          dashboard_pid=$!
+          trap 'kill "$dashboard_pid"' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5000/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          python scripts/test_dashboard.py
+
       - name: Live API test (with BYSE_API_KEY if provided)
         env:
           BYSE_API_KEY: ${{ secrets.BYSE_API_KEY }}
@@ -83,6 +106,7 @@ jobs:
         run: |
           mkdir -p _pages
           cp byse_full_suite/dashboard.html _pages/index.html
+          cp byse_full_suite/dashboard.css byse_full_suite/dashboard.js _pages/
           cp -r byse_full_suite _pages/
           cp README.md _pages/README.md
           echo "<!-- Deployed at $(date) -->" >> _pages/index.html

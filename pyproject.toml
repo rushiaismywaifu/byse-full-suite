@@ -61,7 +61,7 @@ packages = ["byse_full_suite"]
 py-modules = ["byse_uploader"]
 
 [tool.setuptools.package-data]
-byse_full_suite = ["*.html", "*.md"]
+byse_full_suite = ["*.html", "*.css", "*.js", "*.md"]
 
 [tool.black]
 line-length = 100

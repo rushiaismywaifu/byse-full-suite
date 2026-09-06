@@ -37,6 +37,15 @@ python -m py_compile byse_full_suite/*.py byse_uploader.py scripts/health_check.
 
 ## 測試原則
 
+修改網頁時，另執行瀏覽器迴歸測試。先啟動本機伺服器，再於另一個終端機執行：
+
+```bash
+uv run --no-project --with playwright python -m playwright install chromium
+uv run --no-project --with playwright python scripts/test_dashboard.py
+```
+
+預設測試 `http://127.0.0.1:5000`，可透過 `BASE_URL` 指定其他本機位址。測試會攔截帳號、API 與上傳請求，涵蓋桌面／手機導覽、搜尋分頁、錯誤回應、Token 上傳與播放器預覽，不會操作真實帳號。Linux 環境需先備妥 Chromium 系統依賴；測試截圖存於 `/tmp/byse-desktop.png` 與 `/tmp/byse-mobile.png`。CI 會在部署前執行相同的瀏覽器測試。
+
 - **不要打真實 API**: 所有測試都應使用 `unittest.mock.patch` 或 `requests-mock`
   隔離網路層, CI 環境不一定有 `BYSE_API_KEY`
 - **不要 commit 真實 API Key**: `.gitignore` 已屏蔽 `repo.json`, `.env`,
