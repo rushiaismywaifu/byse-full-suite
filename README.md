@@ -36,7 +36,9 @@ Base URL: `https://api.byse.sx` (舊版 `https://filemoonapi.com/api` 已 522)
 byse_full_suite/
 ├── sdk.py              # 完整 SDK
 ├── cli.py              # 互動式 CLI (rich)
-├── dashboard.html      # 單檔網頁儀表板，無需後端
+├── dashboard.html      # Byse Studio 網頁工作空間
+├── dashboard.css       # 響應式介面樣式
+├── dashboard.js        # 互動、連線與上傳管理
 ├── server.py           # Flask 代理伺服器 (可選，解決 CORS)
 └── README.md           # 詳細說明
 
@@ -77,21 +79,28 @@ python byse_full_suite/cli.py
 python byse_full_suite/cli.py --non-interactive
 ```
 
-### 3. Web Dashboard (推薦透過 server.py 啟用, 安全)
+### 3. Byse Studio 網頁工作空間
+
+包含帳號摘要、觀看趨勢、影片搜尋與分頁、資料夾管理、拖曳上傳佇列，以及播放器產生器。桌面與手機皆可使用；未設定帳號時，可點「探索示範」查看範例資料。示範模式不會向真實帳號發送操作。
 
 ```bash
-# 安全模式 (推薦): API Key 從環境變數注入, 不暴露在前端
+# 從專案根目錄安裝並啟動（推薦）
+uv venv
+uv pip install -r requirements.txt
 export BYSE_API_KEY=你的KEY
-cd byse_full_suite
-pip install flask flask-cors requests
-python server.py
+uv run --no-project python byse_full_suite/server.py
 # 打開 http://127.0.0.1:5000/
+```
 
-# 離線模式 (不建議, Key 會存 localStorage 並以 query 帶出)
-cd byse_full_suite
-python -m http.server 8000
+API Key 由代理伺服器保管。若設定了 `BYSE_PROXY_TOKEN`，請在網頁「連線設定」填入代理存取密碼。
+
+```bash
+# 靜態預覽（可使用示範資料；真實帳號須在連線設定選擇直接連線）
+uv run --no-project python -m http.server 8000 --directory byse_full_suite
 # 打開 http://localhost:8000/dashboard.html
 ```
+
+直接連線需 Byse API 支援跨來源請求，API Key 會隨 API 網址傳送。網頁憑證僅存於目前分頁的 `sessionStorage`，不再長期儲存在 `localStorage`。部署靜態網站時，請將 HTML、CSS、JS 三個檔案放在同一目錄；既有 GitHub Pages 工作流程已包含這些資產。
 
 server.py 安全設定 (環境變數):
 - `BYSE_API_KEY` (必填): 由 server 注入, 前端永遠看不到

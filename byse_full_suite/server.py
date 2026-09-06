@@ -21,6 +21,7 @@ from flask import Flask, request, jsonify, send_from_directory, Response, abort
 from flask_cors import CORS
 
 BASE_API = "https://api.byse.sx"
+DASHBOARD_DIRECTORY = Path(__file__).resolve().parent
 
 # 端點白名單: 允許代理的 /api/<path> 路徑
 # 任何不在這裡的路徑都會被拒絕, 避免淪為 open relay
@@ -30,6 +31,7 @@ ALLOWED_API_PATHS = {
     "account/embed_domains",
     "account/custom_domain",
     "account/domain",
+    "account/hls",
     "upload/server",
     "upload/url",
     "upload/status",
@@ -42,6 +44,9 @@ ALLOWED_API_PATHS = {
     "file/clone",
     "file/edit",
     "file/embed_domains",
+    "file/hls",
+    "file/premium_link",
+    "file/direct_link",
     "folder/list",
     "folder/create",
     "files/deleted",
@@ -55,7 +60,7 @@ ALLOWED_API_PATHS = {
     "images/preview",
 }
 
-app = Flask(__name__, static_folder=".")
+app = Flask(__name__, static_folder=None)
 # 不再允許任意 origin 帶 credentials; 預設限制為同源
 # 若需跨網域使用, 請明確設 BYSE_CORS_ORIGINS=https://yourdomain.com,https://another.com
 cors_origins = (
@@ -87,9 +92,34 @@ def _check_proxy_token():
         abort(401, description="Invalid or missing proxy token")
 
 
+@app.route("/health", methods=["GET"])
+def health():
+    """Expose connection setup only, without requiring credentials or contacting Byse."""
+    response = jsonify(
+        {
+            "service": "byse-proxy",
+            "configured": bool(os.getenv("BYSE_API_KEY", "").strip()),
+            "requires_token": bool(os.getenv("BYSE_PROXY_TOKEN", "").strip()),
+        }
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/")
+@app.route("/dashboard.html")
 def index():
-    return send_from_directory(".", "dashboard.html")
+    return send_from_directory(DASHBOARD_DIRECTORY, "dashboard.html")
+
+
+@app.route("/dashboard.css")
+def dashboard_styles():
+    return send_from_directory(DASHBOARD_DIRECTORY, "dashboard.css")
+
+
+@app.route("/dashboard.js")
+def dashboard_script():
+    return send_from_directory(DASHBOARD_DIRECTORY, "dashboard.js")
 
 
 @app.route("/api/<path:path>", methods=["GET", "POST"])
@@ -130,10 +160,10 @@ def proxy_api(path):
                 status=r.status_code,
                 mimetype=r.headers.get("Content-Type", "text/plain"),
             )
-    except requests.RequestException as e:
-        return jsonify({"error": f"upstream request failed: {e}"}), 502
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except requests.RequestException:
+        return jsonify({"error": "Unable to reach Byse. Please try again shortly."}), 502
+    except Exception:
+        return jsonify({"error": "The proxy could not process this request."}), 500
 
 
 @app.route("/upload", methods=["POST"])
@@ -154,9 +184,14 @@ def proxy_upload():
         srv_data = srv_resp.json()
         upload_url = srv_data.get("result")
         if not upload_url:
-            return jsonify({"error": f"cannot get upload server: {srv_data}"}), 502
-    except requests.RequestException as e:
-        return jsonify({"error": f"get upload server fail: {e}"}), 502
+            return (
+                jsonify({"error": "Byse did not provide an upload server. Please try again."}),
+                502,
+            )
+    except requests.RequestException:
+        return jsonify({"error": "Unable to reach the Byse upload service. Please try again."}), 502
+    except (ValueError, TypeError, AttributeError):
+        return jsonify({"error": "Byse returned an invalid upload server response."}), 502
 
     file_obj = request.files.get("file")
     if not file_obj:
@@ -174,15 +209,10 @@ def proxy_upload():
             return jsonify(r.json()), r.status_code
         except Exception:
             return Response(r.text, status=r.status_code)
-    except requests.RequestException as e:
-        return jsonify({"error": f"upload fail: {e}"}), 502
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/dashboard.html")
-def dash():
-    return send_from_directory(".", "dashboard.html")
+    except requests.RequestException:
+        return jsonify({"error": "The upload could not finish. Please try again."}), 502
+    except Exception:
+        return jsonify({"error": "The proxy could not process this upload."}), 500
 
 
 if __name__ == "__main__":

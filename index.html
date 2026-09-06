@@ -1,573 +1,1069 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Byse Full Suite - 完整 API 儀表板</title>
-<style>
-*{box-sizing:border-box}body{margin:0;font-family:ui-sans-system,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Noto Sans TC,sans-serif;background:#0b0e14;color:#e6e8ee}
-header{padding:16px 20px;background:#11151f;border-bottom:1px solid #1e2636;display:flex;flex-wrap:wrap;gap:12px;align-items:center;position:sticky;top:0;z-index:10}
-header h1{margin:0;font-size:18px;letter-spacing:.5px}
-header input,header select{padding:8px 10px;border-radius:8px;border:1px solid #2a344a;background:#0e1320;color:#e6e8ee;min-width:260px}
-header button{padding:8px 14px;border-radius:8px;border:0;background:#4f6ef7;color:white;cursor:pointer;font-weight:600}
-header button.secondary{background:#1e2636}
-nav{display:flex;gap:8px;padding:12px 20px;background:#0e1320;border-bottom:1px solid #1e2636;overflow:auto}
-nav button{white-space:nowrap;padding:8px 14px;border-radius:999px;border:1px solid #2a344a;background:#111827;color:#cbd5e1;cursor:pointer}
-nav button.active{background:#4f6ef7;color:white;border-color:#4f6ef7}
-main{padding:20px;max-width:1200px;margin:0 auto}
-.card{background:#11151f;border:1px solid #1e2636;border-radius:16px;padding:16px;margin-bottom:16px}
-.card h2{margin:0 0 12px 0;font-size:16px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-label{display:block;font-size:12px;color:#9aa4b2;margin-bottom:6px}
-input[type=text],input[type=number],textarea,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #2a344a;background:#0b1220;color:#e6e8ee}
-textarea{min-height:80px;resize:vertical}
-button{padding:9px 14px;border-radius:10px;border:0;background:#4f6ef7;color:white;cursor:pointer;font-weight:600}
-button:disabled{opacity:.5;cursor:not-allowed}
-button.small{padding:6px 10px;font-size:12px;border-radius:8px}
-button.ghost{background:#1c2333;border:1px solid #2a344a}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:10px 8px;border-bottom:1px solid #1e2636;text-align:left}
-th{color:#9aa4b2;font-weight:600;background:#0e1320;position:sticky;top:0}
-tr:hover{background:#131a2a}
-code{background:#1a2336;padding:2px 6px;border-radius:6px;font-size:12px;word-break:break-all}
-.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#1e2636;font-size:11px;color:#9aa4b2}
-.badge.ok{background:#123522;color:#6ee7a5}
-.badge.err{background:#3a1515;color:#fda4af}
-.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.muted{color:#9aa4b2;font-size:12px}
-.progress{height:8px;background:#1e2636;border-radius:999px;overflow:hidden}
-.progress div{height:100%;background:#4f6ef7;width:0%}
-.log{max-height:300px;overflow:auto;background:#0a0e18;border:1px solid #1e2636;border-radius:12px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre-wrap}
-#drop{border:2px dashed #2a344a;border-radius:16px;padding:30px;text-align:center;background:#0e1320}
-#drop.drag{border-color:#4f6ef7;background:#141c2f}
-</style>
-</head>
-<body>
-<header>
-<h1>Byse Full Suite</h1>
-<span class="muted" id="keyStatus">檢測代理狀態中...</span>
-<button class="secondary" onclick="testAll()">測試所有端點</button>
-<span class="muted">12群組 29+端點 | 透過 server.py 代理 (API Key 不再暴露於前端)</span>
-</header>
-
-<nav>
-<button data-tab="dashboard" class="active" onclick="switchTab('dashboard')">帳號總覽</button>
-<button data-tab="files" onclick="switchTab('files')">檔案管理</button>
-<button data-tab="folders" onclick="switchTab('folders')">資料夾</button>
-<button data-tab="upload" onclick="switchTab('upload')">上傳中心</button>
-<button data-tab="encoding" onclick="switchTab('encoding')">編碼監控</button>
-<button data-tab="tools" onclick="switchTab('tools')">工具箱 & DMCA</button>
-</nav>
-
-<main>
-<!-- Dashboard -->
-<div id="tab-dashboard" class="tab">
-<div class="grid">
-<div class="card"><h2>帳號資訊 / account/info</h2><div id="accountInfo">尚未載入</div><div style="margin-top:10px"><button onclick="loadAccountInfo()">重新載入</button></div></div>
-<div class="card"><h2>近 7 天統計 / account/stats</h2><div id="accountStats">尚未載入</div><button onclick="loadAccountStats()">載入</button></div>
-<div class="card"><h2>儲存 / 測試</h2><div id="testAllResult" class="log">點上方 測試所有端點</div><button onclick="loadEmbedDomains()">嘗試取得 embed domain</button><div id="embedDomainResult" class="muted" style="margin-top:8px"></div></div>
-</div>
-</div>
-
-<!-- Files -->
-<div id="tab-files" class="tab" style="display:none">
-<div class="card">
-<h2>檔案列表 / file/list</h2>
-<div class="flex">
-<label>資料夾ID <input id="fileFldId" type="number" value="0" style="width:90px"/></label>
-<label>每頁 <input id="filePerPage" type="number" value="20" style="width:70px"/></label>
-<label>頁碼 <input id="filePage" type="number" value="1" style="width:70px"/></label>
-<label>標題關鍵字 <input id="fileTitle" type="text" placeholder="Iron man" style="width:160px"/></label>
-<button onclick="loadFileList()">載入</button>
-</div>
-<div style="overflow:auto; max-height:500px; margin-top:12px"><table><thead><tr><th>filecode</th><th>標題</th><th>長度</th><th>views</th><th>canplay</th><th>操作</th></tr></thead><tbody id="fileTable"></tbody></table></div>
-</div>
-
-<div class="card">
-<h2>檔案操作 / file/info, file/clone, file/edit, images/*</h2>
-<div class="grid">
-<div><label>Filecode (可多個逗號分隔)</label><input id="opFileCode" type="text" placeholder="1vtkmhfb44rj"/></div>
-<div><label>新標題</label><input id="opNewTitle" type="text"/></div>
-</div>
-<div class="flex" style="margin-top:10px">
-<button onclick="doFileInfo()">詳情 file/info</button>
-<button onclick="doFileClone()">克隆 file/clone</button>
-<button onclick="doFileEditTitle()">改標題 file/edit</button>
-<button onclick="doFileEditPublic(1)">設公開</button>
-<button onclick="doFileEditPublic(0)">設私有</button>
-<button onclick="doThumb()">縮圖 thumb</button>
-<button onclick="doSplash()">海報 splash</button>
-<button onclick="doPreview()">預覽 preview</button>
-<button onclick="doGenerateEmbed()">產生 Embed</button>
-</div>
-<div id="fileOpResult" class="log" style="margin-top:12px">結果顯示</div>
-</div>
-</div>
-
-<!-- Folders -->
-<div id="tab-folders" class="tab" style="display:none">
-<div class="card">
-<h2>資料夾列表 / folder/list</h2>
-<label>父資料夾ID <input id="folderParentId" type="number" value="0" style="width:100px"/></label>
-<button onclick="loadFolderList()">載入</button>
-<div id="folderList" class="log" style="margin-top:10px"></div>
-</div>
-<div class="card">
-<h2>建立資料夾 / folder/create</h2>
-<div class="grid">
-<div><label>名稱</label><input id="newFolderName" type="text" placeholder="My Videos"/></div>
-<div><label>父ID</label><input id="newFolderParent" type="number" value="0"/></div>
-<div><label>描述</label><input id="newFolderDescr" type="text"/></div>
-</div>
-<button onclick="createFolder()" style="margin-top:10px">建立</button>
-<div id="folderCreateResult" class="log" style="margin-top:10px"></div>
-</div>
-</div>
-
-<!-- Upload -->
-<div id="tab-upload" class="tab" style="display:none">
-<div class="card">
-<h2>本地上傳 / upload/server + POST</h2>
-<div id="drop">拖曳影片到這裡，或 <input type="file" id="localFile" multiple/> <div class="muted">支援 MP4,MKV,AVI,WEBM,MOV等12種格式</div></div>
-<div class="flex" style="margin-top:10px"><label>目標資料夾ID <input id="uploadFolderId" type="number" value="0" style="width:100px"/></label><button onclick="uploadLocalFiles()">開始上傳</button></div>
-<div id="uploadProgress" class="log" style="margin-top:10px">等待上傳...</div>
-</div>
-
-<div class="card">
-<h2>遠端上傳 / remote/add (舊) & upload/url (新)</h2>
-<div class="grid"><div><label>直鏈 URL</label><input id="remoteUrl" type="text" placeholder="https://example.com/video.mp4"/></div><div><label>資料夾ID</label><input id="remoteFolderId" type="number" value="0"/></div></div>
-<div class="flex" style="margin-top:10px"><button onclick="remoteUpload()">遠端拉取</button><button class="ghost" onclick="loadRemoteStatusPrompt()">查進度 remote/status</button><button class="ghost" onclick="removeRemotePrompt()">移除佇列 remote/remove</button></div>
-<div id="remoteResult" class="log" style="margin-top:10px"></div>
-</div>
-</div>
-
-<!-- Encoding -->
-<div id="tab-encoding" class="tab" style="display:none">
-<div class="card"><h2>編碼佇列 / encoding/list</h2><button onclick="loadEncodingList()">載入</button><div id="encodingList" class="log" style="margin-top:10px"></div></div>
-<div class="card"><h2>單檔編碼狀態 / encoding/status, restart, delete</h2><div class="flex"><input id="encFileCode" type="text" placeholder="filecode"/><button onclick="loadEncStatus()">狀態</button><button onclick="encRestart()">重啟 restart</button><button onclick="encDelete()">刪除 delete</button></div><div id="encResult" class="log" style="margin-top:10px"></div></div>
-</div>
-
-<!-- Tools -->
-<div id="tab-tools" class="tab" style="display:none">
-<div class="grid">
-<div class="card"><h2>已刪除檔案 / files/deleted</h2><button onclick="loadDeleted()">載入</button><div id="deletedResult" class="log"></div></div>
-<div class="card"><h2>DMCA 清單 / files/dmca</h2><button onclick="loadDMCA()">載入</button><div id="dmcaResult" class="log"></div></div>
-</div>
-
-<div class="card">
-<h2>進階工具：字幕 / 封面 / Logo / HLS / Embed</h2>
-<div class="grid">
-<div><label>Filecode</label><input id="toolFileCode" type="text" placeholder="1vtkmhfb44rj"/></div>
-<div><label>Embed Domain (去後台 Custom Domains 看)</label><input id="toolDomain" type="text" value="byse.sx"/></div>
-<div><label>字幕 VTT URL (c1_file)</label><input id="toolSubUrl" type="text" placeholder="https://example.com/en.vtt"/></div>
-<div><label>字幕標籤 (c1_label)</label><input id="toolSubLabel" type="text" value="English"/></div>
-<div><label>Poster 封面 URL</label><input id="toolPoster" type="text" placeholder="https://example.com/poster.jpg"/></div>
-<div><label>Logo URL</label><input id="toolLogo" type="text" placeholder="https://example.com/logo.png"/></div>
-<div><label>Premium HLS: 觀看者 IP</label><input id="toolIp" type="text" value="8.8.8.8"/></div>
-<div><label>Premium HLS: User-Agent</label><input id="toolUa" type="text" value="Mozilla/5.0 (iPhone)"/></div>
-</div>
-<div class="flex" style="margin-top:12px">
-<button onclick="generateEmbedAdvanced()">產生 Embed URL + Iframe</button>
-<button class="ghost" onclick="tryPremiumHls()">嘗試 Premium HLS (實驗性)</button>
-</div>
-<div id="toolResult" class="log" style="margin-top:12px"></div>
-<div id="toolIframePreview" style="margin-top:12px"></div>
-</div>
-
-<div class="card">
-<h2>Byse Progress 事件監聽 (window.postMessage byse-progress)</h2>
-<p class="muted">當 embed 播放器在 iframe 內播放時，會用 postMessage 回報進度。下方可即時監聽。</p>
-<div id="progressEvents" class="log">等待 byse-progress 事件...</div>
-<iframe id="testPlayer" width="0" height="0" style="border:0"></iframe>
-</div>
-</div>
-
-</main>
-
-<script>
-// === 安全模式: 透過 server.py 代理, API Key 不再寫入前端 ===
-// 所有請求打到同源 /api/<path>, server 從環境變數注入 key
-// 若直接開 dashboard.html (沒走 server.py), 會自動 fallback 提示
-let USE_PROXY = true;  // 預設走代理
-let API_KEY_FALLBACK = localStorage.getItem('byse_api_key') || '';  // 僅離線模式用
-let BASE_URL_FALLBACK = 'https://api.byse.sx';
-
-async function checkProxyMode(){
-  // 探測當前是否透過 server.py 開啟 (嘗試打 /api/account/info 看 401/403/500 而非 404)
-  try{
-    const r = await fetch('/api/account/info', {method:'GET'});
-    USE_PROXY = r.status !== 404;
-  }catch(e){
-    USE_PROXY = false;
-  }
-  const statusEl = document.getElementById('keyStatus');
-  if(USE_PROXY){
-    statusEl.textContent = '✓ 代理模式 (API Key 由 server 注入)';
-    statusEl.style.color = '#4ade80';
-  }else{
-    statusEl.textContent = '⚠ 離線模式 (建議改用 python server.py 啟用代理)';
-    statusEl.style.color = '#fbbf24';
-    // 離線 fallback: 顯示 key 輸入框
-    const k = prompt('未偵測到 server.py 代理。\n若要繼續使用離線模式, 請輸入 API Key (將暫存於 localStorage):', API_KEY_FALLBACK);
-    if(k){
-      API_KEY_FALLBACK = k.trim();
-      localStorage.setItem('byse_api_key', API_KEY_FALLBACK);
-    }
-  }
-}
-
-function buildUrl(path, params={}){
-  if(USE_PROXY){
-    // 代理模式: 不帶 key (server 端注入)
-    const clean = {...params};
-    delete clean.key;
-    const qs = new URLSearchParams(clean).toString();
-    return `/api/${path.replace(/^\//,'')}${qs ? '?'+qs : ''}`;
-  }else{
-    // 離線模式: 直接打 byse API (key 帶 query, 僅供本機測試)
-    const p = {...params, key: API_KEY_FALLBACK};
-    const qs = new URLSearchParams(p).toString();
-    return `${BASE_URL_FALLBACK}/${path.replace(/^\//,'')}?${qs}`;
-  }
-}
-
-async function fetchJson(path, params={}, allow400=false){
-  if(!USE_PROXY && !API_KEY_FALLBACK){
-    throw new Error('離線模式需設定 API Key (請重新整理頁面輸入)');
-  }
-  const url = buildUrl(path, params);
-  const r = await fetch(url);
-  const text = await r.text();
-  try{
-    const j = JSON.parse(text);
-    if(!allow400 && j.status==400 && j.msg=='Invalid operation') throw new Error(`Invalid operation: ${path}`);
-    if(j.msg=='Wrong Auth') throw new Error('Wrong Auth - API Key 錯誤或 server 未設 BYSE_API_KEY');
-    return j;
-  }catch(e){
-    if(text.includes('Page not found')) throw new Error(`${path} 404 前端`);
-    throw e;
-  }
-}
-
-function switchTab(name){
-  document.querySelectorAll('.tab').forEach(el=>el.style.display='none');
-  document.getElementById('tab-'+name).style.display='block';
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  document.querySelector(`nav button[data-tab=${name}]`).classList.add('active');
-}
-
-async function loadAccountInfo(){
-  try{
-    const data = await fetchJson('account/info');
-    document.getElementById('accountInfo').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>
-    <div>餘額: ${data.result?.balance} | 檔案: ${data.result?.files_total} | Email: ${data.result?.email}</div>`;
-  }catch(e){document.getElementById('accountInfo').textContent='錯誤: '+e.message}
-}
-async function loadAccountStats(){
-  try{
-    const data = await fetchJson('account/stats', {last:7});
-    document.getElementById('accountStats').innerHTML = `<pre>${JSON.stringify(data,null,2)}</pre>`;
-  }catch(e){document.getElementById('accountStats').textContent='錯誤: '+e.message}
-}
-async function loadEmbedDomains(){
-  const paths = ['account/embed_domains','file/embed_domains','account/custom_domain'];
-  let out='';
-  for(const p of paths){
-    try{
-      const d = await fetchJson(p);
-      out+= `${p}: ${JSON.stringify(d).slice(0,600)}\n`;
-    }catch(e){ out+= `${p} ERR: ${e.message}\n`; }
-  }
-  document.getElementById('embedDomainResult').textContent = out || '無，請到後台 Settings -> Custom Domains';
-}
-
-async function testAll(){
-  const endpoints = [
-    'account/info','account/stats','upload/server','file/list','folder/list','files/deleted','files/dmca','encoding/list'
-  ];
-  let log='';
-  for(const ep of endpoints){
-    try{
-      const params = ep.includes('file/list')?{fld_id:0,per_page:1}:{};
-      const data = await fetchJson(ep, params);
-      log+= `✅ ${ep} OK: ${JSON.stringify(data).slice(0,200)}\n`;
-    }catch(e){ log+= `❌ ${ep} ERR: ${e.message}\n`; }
-  }
-  document.getElementById('testAllResult').textContent = log;
-  loadAccountInfo();
-}
-
-// Files
-async function loadFileList(){
-  const fld_id=document.getElementById('fileFldId').value||0;
-  const per_page=document.getElementById('filePerPage').value||20;
-  const page=document.getElementById('filePage').value||1;
-  const title=document.getElementById('fileTitle').value||'';
-  try{
-    const data = await fetchJson('file/list',{fld_id,per_page,page,title: title||undefined});
-    const tbody=document.getElementById('fileTable');
-    tbody.innerHTML='';
-    let files=[];
-    if(data.result && data.result.files) files=data.result.files;
-    else if(Array.isArray(data.result)) files=data.result;
-    files.forEach(f=>{
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td><code>${f.file_code}</code></td><td>${(f.title||'').slice(0,40)}</td><td>${f.length||''}</td><td>${f.views||0}</td><td>${f.canplay||0}</td><td><button class="small" onclick="setOpCode('${f.file_code}')">選取</button> <button class="small ghost" onclick="quickInfo('${f.file_code}')">詳情</button></td>`;
-      tbody.appendChild(tr);
-    });
-  }catch(e){alert(e.message)}
-}
-function setOpCode(code){document.getElementById('opFileCode').value=code; document.getElementById('toolFileCode').value=code; document.getElementById('encFileCode').value=code;}
-async function quickInfo(code){document.getElementById('opFileCode').value=code; doFileInfo();}
-
-async function doFileInfo(){
-  const code=document.getElementById('opFileCode').value.trim();
-  if(!code) return alert('輸入 filecode');
-  try{
-    const data=await fetchJson('file/info',{file_code:code});
-    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
-}
-async function doFileClone(){
-  const code=document.getElementById('opFileCode').value.trim();
-  try{
-    const data=await fetchJson('file/clone',{file_code:code});
-    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
-}
-async function doFileEditTitle(){
-  const code=document.getElementById('opFileCode').value.trim();
-  const title=document.getElementById('opNewTitle').value.trim();
-  if(!title) return alert('輸入新標題');
-  try{
-    const data=await fetchJson('file/edit',{file_code:code,file_title:title});
-    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
-}
-async function doFileEditPublic(pub){
-  const code=document.getElementById('opFileCode').value.trim();
-  try{
-    const data=await fetchJson('file/edit',{file_code:code,file_public:pub});
-    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
-}
-async function doThumb(){
-  const code=document.getElementById('opFileCode').value.trim();
-  try{
-    const data=await fetchJson('images/thumb',{file_code:code});
-    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
-}
-async function doSplash(){
-  const code=document.getElementById('opFileCode').value.trim();
-  try{
-    const data=await fetchJson('images/splash',{file_code:code});
-    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
-}
-async function doPreview(){
-  const code=document.getElementById('opFileCode').value.trim();
-  try{
-    const data=await fetchJson('images/preview',{file_code:code});
-    document.getElementById('fileOpResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('fileOpResult').textContent='ERR: '+e.message}
-}
-function doGenerateEmbed(){
-  const code=document.getElementById('opFileCode').value.trim();
-  const domain=document.getElementById('toolDomain').value||'byse.sx';
-  const url=`https://${domain}/e/${code}`;
-  document.getElementById('fileOpResult').textContent=`Embed URL: ${url}\nIframe: <iframe src="${url}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
-}
-
-// Folders
-async function loadFolderList(){
-  const fld=document.getElementById('folderParentId').value||0;
-  try{
-    const data=await fetchJson('folder/list',{fld_id:fld});
-    document.getElementById('folderList').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('folderList').textContent='ERR: '+e.message}
-}
-async function createFolder(){
-  const name=document.getElementById('newFolderName').value.trim();
-  const parent=document.getElementById('newFolderParent').value||0;
-  const descr=document.getElementById('newFolderDescr').value||'';
-  if(!name) return alert('輸入名稱');
-  try{
-    const data=await fetchJson('folder/create',{name,parent_id:parent,descr});
-    document.getElementById('folderCreateResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('folderCreateResult').textContent='ERR: '+e.message}
-}
-
-// Upload
-const drop=document.getElementById('drop');
-if(drop){
-  drop.addEventListener('dragover', e=>{e.preventDefault(); drop.classList.add('drag')});
-  drop.addEventListener('dragleave', ()=>drop.classList.remove('drag'));
-  drop.addEventListener('drop', e=>{e.preventDefault(); drop.classList.remove('drag'); document.getElementById('localFile').files=e.dataTransfer.files;});
-}
-async function getUploadServer(){
-  const data=await fetchJson('upload/server');
-  return data.result;
-}
-async function uploadLocalFiles(){
-  const input=document.getElementById('localFile');
-  const fld=document.getElementById('uploadFolderId').value||0;
-  const log=document.getElementById('uploadProgress');
-  if(!input.files.length) return alert('選檔案');
-  log.textContent = USE_PROXY ? '透過 /upload 代理上傳...\n' : '取得上傳伺服器...\n';
-  try{
-    const server = USE_PROXY ? null : await getUploadServer();
-    if(server) log.textContent+=`Server: ${server}\n`;
-    for(const file of input.files){
-      log.textContent+=`\n上傳 ${file.name} (${(file.size/1024/1024).toFixed(2)}MB)...\n`;
-      const form=new FormData();
-      // 代理模式: 不帶 key (server 端注入); 離線模式: 帶 key
-      if(!USE_PROXY) form.append('key', API_KEY_FALLBACK);
-      form.append('file', file);
-      if(fld!=0) form.append('fld_id', fld);
-      const uploadTarget = USE_PROXY ? '/upload' : server;
-      const resp=await fetch(uploadTarget, {method:'POST', body:form});
-      const text=await resp.text();
-      log.textContent+=`回應: ${text.slice(0,2000)}\n`;
-      try{
-        const j=JSON.parse(text);
-        if(j.files&&j.files[0]){
-          const fc=j.files[0].filecode;
-          log.textContent+=`✅ 成功 filecode=${fc} => https://byse.sx/e/${fc}\n`;
-        }
-      }catch{}
-    }
-  }catch(e){log.textContent+='ERR: '+e.message}
-}
-async function remoteUpload(){
-  const url=document.getElementById('remoteUrl').value.trim();
-  const fld=document.getElementById('remoteFolderId').value||0;
-  if(!url) return alert('輸入 URL');
-  try{
-    const data=await fetchJson('remote/add',{url,fld_id:fld}, true);
-    document.getElementById('remoteResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){
-    // fallback upload/url
-    try{
-      const data2=await fetchJson('upload/url',{url,fld_id:fld}, true);
-      document.getElementById('remoteResult').textContent=JSON.stringify(data2,null,2);
-    }catch(e2){document.getElementById('remoteResult').textContent='ERR: '+e.message+' / '+e2.message;}
-  }
-}
-async function loadRemoteStatusPrompt(){
-  const code=prompt('輸入遠端 filecode');
-  if(!code) return;
-  try{
-    const data=await fetchJson('remote/status',{file_code:code}, true);
-    document.getElementById('remoteResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('remoteResult').textContent='ERR: '+e.message}
-}
-async function removeRemotePrompt(){
-  const code=prompt('輸入要移除的 filecode');
-  if(!code) return;
-  try{
-    const data=await fetchJson('remote/remove',{file_code:code}, true);
-    document.getElementById('remoteResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('remoteResult').textContent='ERR: '+e.message}
-}
-
-// Encoding
-async function loadEncodingList(){
-  try{
-    const data=await fetchJson('encoding/list');
-    document.getElementById('encodingList').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('encodingList').textContent='ERR: '+e.message}
-}
-async function loadEncStatus(){
-  const code=document.getElementById('encFileCode').value.trim();
-  if(!code) return alert('輸入 filecode');
-  try{
-    const data=await fetchJson('encoding/status',{file_code:code});
-    document.getElementById('encResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('encResult').textContent='ERR: '+e.message}
-}
-async function encRestart(){
-  const code=document.getElementById('encFileCode').value.trim();
-  try{
-    const data=await fetchJson('encoding/restart',{file_code:code}, true);
-    document.getElementById('encResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('encResult').textContent='ERR: '+e.message}
-}
-async function encDelete(){
-  const code=document.getElementById('encFileCode').value.trim();
-  try{
-    const data=await fetchJson('encoding/delete',{file_code:code}, true);
-    document.getElementById('encResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('encResult').textContent='ERR: '+e.message}
-}
-
-// Tools
-async function loadDeleted(){
-  try{
-    const data=await fetchJson('files/deleted');
-    document.getElementById('deletedResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('deletedResult').textContent='ERR: '+e.message}
-}
-async function loadDMCA(){
-  try{
-    const data=await fetchJson('files/dmca');
-    document.getElementById('dmcaResult').textContent=JSON.stringify(data,null,2);
-  }catch(e){document.getElementById('dmcaResult').textContent='ERR: '+e.message}
-}
-function generateEmbedAdvanced(){
-  const code=document.getElementById('toolFileCode').value.trim();
-  const domain=document.getElementById('toolDomain').value||'byse.sx';
-  const subUrl=document.getElementById('toolSubUrl').value.trim();
-  const subLabel=document.getElementById('toolSubLabel').value.trim()||'English';
-  const poster=document.getElementById('toolPoster').value.trim();
-  const logo=document.getElementById('toolLogo').value.trim();
-  if(!code) return alert('輸入 filecode');
-  const params=new URLSearchParams();
-  if(subUrl){ params.set('c1_file', subUrl); params.set('c1_label', subLabel); }
-  if(poster) params.set('poster', poster);
-  if(logo) params.set('logo', logo);
-  const base=`https://${domain}/e/${code}`;
-  const url = params.toString()? `${base}?${params.toString()}`: base;
-  const iframe=`<iframe src="${url}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
-  document.getElementById('toolResult').textContent=`URL:\n${url}\n\nIframe:\n${iframe}`;
-  document.getElementById('toolIframePreview').innerHTML=iframe;
-  // 同時試聽 byse-progress
-  document.getElementById('testPlayer').src=url;
-}
-async function tryPremiumHls(){
-  const code=document.getElementById('toolFileCode').value.trim();
-  const ip=document.getElementById('toolIp').value||'8.8.8.8';
-  const ua=document.getElementById('toolUa').value||'Mozilla/5.0';
-  if(!code) return alert('輸入 filecode');
-  const candidates=['file/hls','file/premium_link','file/direct_link','account/hls'];
-  let out='';
-  for(const p of candidates){
-    try{
-      const data=await fetchJson(p,{file_code:code,ip,ua}, true);
-      out+= `${p}: ${JSON.stringify(data).slice(0,800)}\n`;
-    }catch(e){ out+= `${p} ERR: ${e.message}\n`; }
-  }
-  document.getElementById('toolResult').textContent=out || 'Premium HLS 需帳號開通 premium';
-}
-
-// byse-progress listener
-window.addEventListener('message', (event)=>{
-  const data=event.data;
-  if(!data || data.type!=='byse-progress') return;
-  const log=document.getElementById('progressEvents');
-  const line=`[${new Date().toLocaleTimeString()}] file:${data.file_code} ${data.progress}% ${data.timestamp}/${data.duration}s`;
-  log.textContent = line + '\n' + log.textContent.slice(0,3000);
-});
-
-// init
-(async function init(){
-  await checkProxyMode();
-  // 若代理模式且 server 已設 key, 或離線模式且有 fallback key, 就自動載入
-  if(USE_PROXY || API_KEY_FALLBACK){
-    loadAccountInfo();
-  }
-})();
-</script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#193d35" />
+    <meta
+      name="description"
+      content="Byse Studio：管理影片、上傳檔案，並查看你的播放數據。"
+    />
+    <title>Byse Studio · 影片工作空間</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23193d35'/%3E%3Cpath d='m16 11 13 9-13 9z' fill='%23cce5aa'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./dashboard.css" />
+    <script src="./dashboard.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要內容</a>
+    <svg
+      class="icon-definitions"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <symbol id="i-grid" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </symbol>
+      <symbol id="i-video" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="3" />
+        <path d="m10 8 6 4-6 4z" />
+      </symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24">
+        <path
+          d="M3 7V5a2 2 0 0 1 2-2h5l3 3h6a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
+        />
+        <path d="M3 10h18" />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24">
+        <path
+          d="M12 16V3m-5 5 5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"
+        />
+      </symbol>
+      <symbol id="i-encoding" viewBox="0 0 24 24">
+        <path
+          d="M20 7a9 9 0 0 0-15-2L2 8m0-5v5h5m-3 9a9 9 0 0 0 15 2l3-3m0 5v-5h-5"
+        />
+      </symbol>
+      <symbol id="i-tools" viewBox="0 0 24 24">
+        <path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 20" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 17h16" />
+        <circle cx="9" cy="7" r="3" />
+        <circle cx="16" cy="17" r="3" />
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24">
+        <path d="M5 12h14m-6-6 6 6-6 6" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m16 16 5 5" />
+      </symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24">
+        <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" />
+        <circle cx="12" cy="12" r="3" />
+      </symbol>
+      <symbol id="i-storage" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="3" />
+        <path d="M3 14h18M7 17h.01M11 17h.01" />
+      </symbol>
+      <symbol id="i-wallet" viewBox="0 0 24 24">
+        <path
+          d="M20 8V5a2 2 0 0 0-2-2H6a3 3 0 0 0 0 6h14v11H6a3 3 0 0 1-3-3V6"
+        />
+        <path d="M20 12h-5v5h5" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M6 18 18 6" />
+      </symbol>
+    </svg>
+    <aside class="sidebar">
+      <a class="brand" href="#dashboard" aria-label="Byse Studio 首頁"
+        ><span class="brand-mark">▷</span
+        ><span
+          >byse<span class="brand-dot">.</span><small>STUDIO</small></span
+        ></a
+      >
+      <div class="workspace-label">
+        <span class="workspace-avatar">B</span>
+        <div>我的工作空間<small>Video workspace</small></div>
+      </div>
+      <span class="nav-caption">工作空間</span>
+      <nav class="main-nav" aria-label="主要導覽">
+        <button
+          type="button"
+          data-tab="dashboard"
+          class="active"
+          aria-current="page"
+          onclick="switchTab('dashboard')"
+        >
+          <svg class="icon" aria-hidden="true"><use href="#i-grid" /></svg
+          >工作台
+        </button>
+        <button type="button" data-tab="files" onclick="switchTab('files')">
+          <svg class="icon" aria-hidden="true"><use href="#i-video" /></svg
+          >影片資料庫
+        </button>
+        <button type="button" data-tab="folders" onclick="switchTab('folders')">
+          <svg class="icon" aria-hidden="true"><use href="#i-folder" /></svg
+          >資料夾
+        </button>
+        <button type="button" data-tab="upload" onclick="switchTab('upload')">
+          <svg class="icon" aria-hidden="true"><use href="#i-upload" /></svg
+          >上傳中心
+        </button>
+        <button
+          type="button"
+          data-tab="encoding"
+          onclick="switchTab('encoding')"
+        >
+          <svg class="icon" aria-hidden="true"><use href="#i-encoding" /></svg
+          >轉碼佇列
+        </button>
+        <button type="button" data-tab="tools" onclick="switchTab('tools')">
+          <svg class="icon" aria-hidden="true"><use href="#i-tools" /></svg
+          >播放器與工具
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="connection-card">
+          <span class="connection-eyebrow">連線狀態</span>
+          <p id="keyStatus" role="status">正在檢查連線…</p>
+          <button class="sidebar-settings" onclick="openSettings()">
+            管理連線<svg class="icon" aria-hidden="true">
+              <use href="#i-arrow" />
+            </svg>
+          </button>
+        </div>
+        <div class="sidebar-footer">
+          <span>BYSE FULL SUITE</span><span>讓創作持續發生 ↗</span>
+        </div>
+      </div>
+    </aside>
+    <div class="app-body">
+      <header class="topbar">
+        <div class="breadcrumb">
+          工作空間<span>/</span><strong>Byse Studio</strong>
+        </div>
+        <div class="topbar-actions">
+          <button
+            class="icon-button"
+            onclick="openSettings()"
+            aria-label="連線設定"
+            title="連線設定"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#i-settings" />
+            </svg></button
+          ><span class="topbar-divider"></span
+          ><button class="button small" onclick="switchTab('upload')">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg
+            >上傳影片
+          </button>
+        </div>
+      </header>
+      <main id="main" tabindex="-1">
+        <div class="page-heading">
+          <div>
+            <div class="eyebrow">YOUR VIDEO WORKSPACE</div>
+            <h1 id="pageTitle">工作空間總覽</h1>
+            <p id="pageDescription">整理你的影片，專注下一個好故事。</p>
+          </div>
+          <button
+            class="button secondary refresh-button"
+            onclick="refreshCurrent()"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-encoding" /></svg
+            >重新整理
+          </button>
+        </div>
+        <div id="connectionBanner" class="connection-banner" role="status">
+          <div>
+            <span class="status-dot"></span
+            ><span id="connectionBannerText">正在確認連線狀態…</span>
+          </div>
+          <div class="banner-actions">
+            <button class="text-button" id="demoToggle" onclick="toggleDemo()">
+              體驗示範資料</button
+            ><button class="button secondary small" onclick="openSettings()">
+              連線設定
+            </button>
+          </div>
+        </div>
+        <section id="tab-dashboard" class="tab" aria-label="工作台">
+          <div class="metric-grid">
+            <article class="metric-card">
+              <div class="metric-label">
+                影片總數<svg class="icon" aria-hidden="true">
+                  <use href="#i-video" />
+                </svg>
+              </div>
+              <div class="metric-value" id="metricFiles">—</div>
+              <div class="metric-footnote">你的創作收藏</div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-label">
+                近 7 天觀看<svg class="icon" aria-hidden="true">
+                  <use href="#i-eye" />
+                </svg>
+              </div>
+              <div class="metric-value" id="metricViews">—</div>
+              <div class="metric-footnote">每一次播放，都是連結</div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-label">
+                已用儲存空間<svg class="icon" aria-hidden="true">
+                  <use href="#i-storage" />
+                </svg>
+              </div>
+              <div class="metric-value" id="metricStorage">—</div>
+              <div class="metric-footnote" id="metricStorageFootnote">
+                連線後查看使用量
+              </div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-label">
+                帳號餘額<svg class="icon" aria-hidden="true">
+                  <use href="#i-wallet" />
+                </svg>
+              </div>
+              <div class="metric-value" id="metricBalance">—</div>
+              <div class="metric-footnote">依帳號回報的金額</div>
+            </article>
+          </div>
+          <div class="dashboard-grid">
+            <article class="panel recent-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>最近的影片<span class="heading-dot"></span></h2>
+                  <p>讓所有作品都有自己的位置。</p>
+                </div>
+                <button class="text-button" onclick="switchTab('files')">
+                  查看全部<svg class="icon" aria-hidden="true">
+                    <use href="#i-arrow" />
+                  </svg>
+                </button>
+              </div>
+              <div class="table-scroll">
+                <table class="recent-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">影片名稱</th>
+                      <th scope="col">狀態</th>
+                      <th scope="col">觀看次數</th>
+                      <th scope="col"><span class="sr-only">操作</span></th>
+                    </tr>
+                  </thead>
+                  <tbody id="recentFiles">
+                    <tr>
+                      <td colspan="4">
+                        <div class="empty-state">
+                          <svg class="icon empty-icon" aria-hidden="true">
+                            <use href="#i-video" /></svg
+                          ><strong>你的影片，準備在這裡集合</strong>
+                          <p>連線帳號以查看影片，或先體驗示範資料。</p>
+                          <button
+                            class="button secondary small"
+                            onclick="openSettings()"
+                          >
+                            連線我的帳號
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="panel-footer">
+                <span class="muted" id="activitySummary"
+                  >影片狀態與帳號同步</span
+                ><span class="subtle-label">YOUR COLLECTION</span>
+              </div>
+            </article>
+            <article class="panel analytics-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>觀看趨勢</h2>
+                  <p>你的故事，被更多人看見。</p>
+                </div>
+                <span class="period-label">近 7 天</span>
+              </div>
+              <div id="accountStats">
+                <div class="empty-state">
+                  <svg class="icon empty-icon" aria-hidden="true">
+                    <use href="#i-eye" /></svg
+                  ><strong>每一次觀看都值得記錄</strong>
+                  <p>連線後，在這裡查看播放趨勢。</p>
+                </div>
+              </div>
+            </article>
+          </div>
+          <div class="dashboard-bottom-grid">
+            <article class="upload-invitation">
+              <div class="invitation-art" aria-hidden="true">
+                <div class="film-card film-back"></div>
+                <div class="film-card film-front">
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-video" /></svg
+                  ><span>YOUR NEXT STORY</span>
+                </div>
+                <svg class="art-spark" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="m12 0 3.2 8.8L24 12l-8.8 3.2L12 24l-3.2-8.8L0 12l8.8-3.2Z"
+                  />
+                </svg>
+              </div>
+              <div class="invitation-copy">
+                <span class="eyebrow">MAKE ROOM FOR MORE</span>
+                <h2>下一個好故事，從這裡開始。</h2>
+                <p>拖入影片、整理作品，讓分享更簡單。</p>
+                <button onclick="switchTab('upload')">
+                  上傳新影片<svg class="icon" aria-hidden="true">
+                    <use href="#i-arrow" />
+                  </svg>
+                </button>
+              </div>
+            </article>
+            <article class="panel account-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>帳號概況</h2>
+                  <p>你的工作空間資訊</p>
+                </div>
+                <svg class="icon muted" aria-hidden="true">
+                  <use href="#i-settings" />
+                </svg>
+              </div>
+              <div id="accountInfo">
+                <div class="account-placeholder">
+                  <span class="workspace-avatar">B</span>
+                  <div>
+                    <strong>尚未連線帳號</strong>
+                    <p class="muted">設定完成後即可開始管理影片。</p>
+                  </div>
+                </div>
+              </div>
+              <button class="text-button" onclick="openSettings()">
+                管理帳號連線<svg class="icon" aria-hidden="true">
+                  <use href="#i-arrow" />
+                </svg>
+              </button>
+            </article>
+          </div>
+        </section>
+        <section id="tab-files" class="tab" hidden aria-label="影片資料庫">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>
+                  所有影片 <span class="count-badge" id="fileCount">—</span>
+                </h2>
+                <p>搜尋、管理與分享你的作品。</p>
+              </div>
+              <button type="button" class="small" onclick="switchTab('upload')">
+                新增影片
+              </button>
+            </div>
+            <form class="filter-bar" onsubmit="searchFiles(event)">
+              <div class="search-field">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-search" /></svg
+                ><input
+                  id="fileTitle"
+                  type="search"
+                  aria-label="搜尋影片標題"
+                  placeholder="搜尋影片標題…"
+                />
+              </div>
+              <label class="inline-field" for="fileFldId"
+                >資料夾 ID<input
+                  id="fileFldId"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value="0" /></label
+              ><label class="inline-field" for="filePerPage"
+                >每頁<select id="filePerPage">
+                  <option value="10">10 部</option>
+                  <option value="20" selected>20 部</option>
+                  <option value="50">50 部</option>
+                </select></label
+              ><input id="filePage" type="hidden" value="1" /><button
+                class="secondary"
+                type="submit"
+              >
+                搜尋
+              </button>
+            </form>
+            <div class="table-scroll">
+              <table class="file-table">
+                <thead>
+                  <tr>
+                    <th scope="col">影片名稱</th>
+                    <th scope="col">片長</th>
+                    <th scope="col">觀看次數</th>
+                    <th scope="col">狀態</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="fileTable">
+                  <tr>
+                    <td colspan="5">
+                      <div class="empty-state">
+                        <strong>還沒有載入影片</strong>
+                        <p>連線帳號後即可搜尋與管理。</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination">
+              <span class="muted" id="filePagination">第 1 頁</span>
+              <div>
+                <button
+                  id="prevPage"
+                  class="secondary small"
+                  onclick="changeFilePage(-1)"
+                  disabled
+                >
+                  上一頁</button
+                ><button
+                  id="nextPage"
+                  class="secondary small"
+                  onclick="changeFilePage(1)"
+                  disabled
+                >
+                  下一頁
+                </button>
+              </div>
+            </div>
+          </article>
+          <details id="fileOperations" class="panel disclosure">
+            <summary>
+              <span
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-settings" /></svg
+                >影片管理與分享</span
+              ><span class="muted">選取影片，或輸入影片代碼</span>
+            </summary>
+            <div class="disclosure-content">
+              <div class="form-grid">
+                <label for="opFileCode"
+                  >影片代碼（查詢可用逗號分隔）<input
+                    id="opFileCode"
+                    type="text"
+                    placeholder="從上方列表選取影片" /></label
+                ><label for="opNewTitle"
+                  >影片標題<input
+                    id="opNewTitle"
+                    type="text"
+                    placeholder="輸入新的影片標題"
+                /></label>
+              </div>
+              <div class="action-group">
+                <button type="button" class="" onclick="doFileInfo()">
+                  查看詳情</button
+                ><button
+                  type="button"
+                  class="secondary"
+                  onclick="doFileEditTitle()"
+                >
+                  儲存標題</button
+                ><button
+                  type="button"
+                  class="secondary"
+                  onclick="doFileClone()"
+                >
+                  建立副本</button
+                ><button
+                  type="button"
+                  class="secondary"
+                  onclick="doFileEditPublic(1)"
+                >
+                  設為公開</button
+                ><button
+                  type="button"
+                  class="secondary"
+                  onclick="doFileEditPublic(0)"
+                >
+                  設為私人
+                </button>
+              </div>
+              <div class="action-group">
+                <button type="button" class="text-button" onclick="doThumb()">
+                  取得縮圖</button
+                ><button type="button" class="text-button" onclick="doSplash()">
+                  取得海報</button
+                ><button
+                  type="button"
+                  class="text-button"
+                  onclick="doPreview()"
+                >
+                  取得預覽</button
+                ><button
+                  type="button"
+                  class="text-button"
+                  onclick="doGenerateEmbed()"
+                >
+                  產生嵌入碼</button
+                ><button
+                  type="button"
+                  class="text-button"
+                  onclick="copyResult('fileOpResult')"
+                >
+                  複製結果
+                </button>
+              </div>
+              <div id="fileOpResult" class="result-panel" role="status">
+                選擇操作後，結果會顯示在這裡。
+              </div>
+            </div>
+          </details>
+        </section>
+        <section id="tab-folders" class="tab" hidden aria-label="資料夾">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>影片資料夾</h2>
+                <p>依專案、主題或系列，為作品分類。</p>
+              </div>
+              <button
+                type="button"
+                class="secondary small"
+                onclick="loadFolderList()"
+              >
+                重新載入
+              </button>
+            </div>
+            <form
+              class="filter-bar"
+              onsubmit="
+                event.preventDefault();
+                loadFolderList();
+              "
+            >
+              <label class="inline-field" for="folderParentId"
+                >父資料夾 ID<input
+                  id="folderParentId"
+                  type="number"
+                  min="0"
+                  value="0" /></label
+              ><button class="secondary" type="submit">開啟</button
+              ><span class="muted">0 代表根目錄</span>
+            </form>
+            <div id="folderList" class="folder-grid">
+              <div class="empty-state">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-folder" /></svg
+                ><strong>讓作品井然有序</strong>
+                <p>連線後查看資料夾，或建立新的分類。</p>
+              </div>
+            </div>
+          </article>
+          <article class="panel padded-panel">
+            <div class="section-title">
+              <h2>建立新資料夾</h2>
+              <p>給下一個系列，一個專屬的位置。</p>
+            </div>
+            <form
+              onsubmit="
+                event.preventDefault();
+                createFolder();
+              "
+            >
+              <div class="form-grid three-columns">
+                <label for="newFolderName"
+                  >資料夾名稱<input
+                    id="newFolderName"
+                    type="text"
+                    placeholder="例如：旅途紀錄" /></label
+                ><label for="newFolderParent"
+                  >父資料夾 ID<input
+                    id="newFolderParent"
+                    type="number"
+                    min="0"
+                    value="0" /></label
+                ><label for="newFolderDescr"
+                  >描述（選填）<input
+                    id="newFolderDescr"
+                    type="text"
+                    placeholder="簡單介紹這個系列"
+                /></label>
+              </div>
+              <button type="submit">
+                <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg
+                >建立資料夾
+              </button>
+              <div id="folderCreateResult" class="result-panel" role="status">
+                新資料夾會建立在指定的父資料夾中。
+              </div>
+            </form>
+          </article>
+        </section>
+        <section id="tab-upload" class="tab" hidden aria-label="上傳中心">
+          <div class="upload-layout">
+            <article class="panel padded-panel">
+              <div class="section-title">
+                <span class="eyebrow">FROM YOUR DEVICE</span>
+                <h2>把新的故事帶進來</h2>
+                <p>選擇影片，一次上傳多個檔案。</p>
+              </div>
+              <div id="drop" class="drop-zone">
+                <span class="drop-icon"
+                  ><svg class="icon" aria-hidden="true">
+                    <use href="#i-upload" /></svg
+                ></span>
+                <h3>將影片拖曳到這裡</h3>
+                <p>或從你的裝置中選擇檔案</p>
+                <label class="button file-picker" for="localFile"
+                  >選擇影片<input
+                    id="localFile"
+                    type="file"
+                    multiple
+                    accept=".mp4,.mkv,.avi,.webm,.mov,.wmv,.flv,.m4v,.mpg,.mpeg,.3gp,.ts" /></label
+                ><span class="field-help"
+                  >支援 MP4、MKV、MOV、WEBM 等影片格式</span
+                >
+              </div>
+              <div
+                id="uploadQueue"
+                class="upload-queue"
+                aria-live="polite"
+              ></div>
+              <div class="upload-controls">
+                <label class="inline-field" for="uploadFolderId"
+                  >目標資料夾 ID<input
+                    id="uploadFolderId"
+                    type="number"
+                    min="0"
+                    value="0" /></label
+                ><button id="uploadStart" onclick="uploadLocalFiles()">
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-upload" /></svg
+                  >開始上傳
+                </button>
+              </div>
+              <div id="uploadProgress" class="result-panel" role="status">
+                選擇檔案後，即可確認佇列並開始上傳。
+              </div>
+            </article>
+            <aside class="upload-note">
+              <span class="eyebrow">A LITTLE ORGANIZATION</span>
+              <h2>先整理，<br />再分享。</h2>
+              <div class="note-line"></div>
+              <div class="note-step">
+                <span>01</span>
+                <div>
+                  <h3>選擇你的影片</h3>
+                  <p>支援拖曳，也能一次選取多個檔案。</p>
+                </div>
+              </div>
+              <div class="note-step">
+                <span>02</span>
+                <div>
+                  <h3>放進適合的資料夾</h3>
+                  <p>填入資料夾 ID；保留 0 即存入根目錄。</p>
+                </div>
+              </div>
+              <div class="note-step">
+                <span>03</span>
+                <div>
+                  <h3>等待轉碼，準備分享</h3>
+                  <p>上傳完成後，可在轉碼佇列查看處理狀態。</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="text-button"
+                onclick="switchTab('folders')"
+              >
+                管理資料夾<svg class="icon" aria-hidden="true">
+                  <use href="#i-arrow" />
+                </svg>
+              </button>
+            </aside>
+          </div>
+          <article class="panel padded-panel">
+            <div class="section-title">
+              <span class="eyebrow">FROM A LINK</span>
+              <h2>從網址匯入影片</h2>
+              <p>貼上可直接下載的影片網址，由遠端伺服器接手上傳。</p>
+            </div>
+            <form
+              onsubmit="
+                event.preventDefault();
+                remoteUpload();
+              "
+            >
+              <div class="form-grid">
+                <label for="remoteUrl"
+                  >影片直連網址<input
+                    id="remoteUrl"
+                    type="url"
+                    placeholder="https://example.com/video.mp4" /></label
+                ><label for="remoteFolderId"
+                  >目標資料夾 ID<input
+                    id="remoteFolderId"
+                    type="number"
+                    min="0"
+                    value="0"
+                /></label>
+              </div>
+              <button type="submit">
+                開始匯入<svg class="icon" aria-hidden="true">
+                  <use href="#i-arrow" />
+                </svg>
+              </button>
+            </form>
+            <div class="remote-status-controls">
+              <label for="remoteFileCode"
+                >遠端任務的影片代碼<input
+                  id="remoteFileCode"
+                  type="text"
+                  placeholder="匯入後取得的影片代碼" /></label
+              ><button
+                type="button"
+                class="secondary"
+                onclick="loadRemoteStatusPrompt()"
+              >
+                查看進度</button
+              ><button
+                type="button"
+                class="danger secondary"
+                onclick="removeRemotePrompt()"
+              >
+                移除任務
+              </button>
+            </div>
+            <div id="remoteResult" class="result-panel" role="status">
+              匯入結果與任務進度會顯示在這裡。
+            </div>
+          </article>
+        </section>
+        <section id="tab-encoding" class="tab" hidden aria-label="轉碼佇列">
+          <article class="panel">
+            <div class="panel-heading">
+              <div>
+                <h2>影片處理狀態</h2>
+                <p>上傳後的影片會經過轉碼，完成後即可播放。</p>
+              </div>
+              <button
+                type="button"
+                class="secondary small"
+                onclick="loadEncodingList()"
+              >
+                更新佇列
+              </button>
+            </div>
+            <div id="encodingList" class="list-container">
+              <div class="empty-state">
+                <svg class="icon" aria-hidden="true">
+                  <use href="#i-encoding" /></svg
+                ><strong>在這裡追蹤處理進度</strong>
+                <p>連線後即可查看目前的轉碼任務。</p>
+              </div>
+            </div>
+          </article>
+          <article class="panel padded-panel">
+            <div class="section-title">
+              <h2>管理轉碼任務</h2>
+              <p>輸入影片代碼，以查詢或重新啟動處理。</p>
+            </div>
+            <label for="encFileCode"
+              >影片代碼<input
+                id="encFileCode"
+                type="text"
+                placeholder="輸入要查看的影片代碼"
+            /></label>
+            <div class="action-group">
+              <button type="button" class="" onclick="loadEncStatus()">
+                查詢狀態</button
+              ><button type="button" class="secondary" onclick="encRestart()">
+                重新轉碼</button
+              ><button
+                type="button"
+                class="secondary danger"
+                onclick="encDelete()"
+              >
+                刪除轉碼任務
+              </button>
+            </div>
+            <div id="encResult" class="result-panel" role="status">
+              選擇操作後，結果會顯示在這裡。
+            </div>
+          </article>
+        </section>
+        <section id="tab-tools" class="tab" hidden aria-label="播放器與工具">
+          <article class="panel padded-panel">
+            <div class="section-title">
+              <span class="eyebrow">READY TO SHARE</span>
+              <h2>打造你的播放器</h2>
+              <p>加入字幕、封面與標誌，產生可分享的網址和嵌入碼。</p>
+            </div>
+            <div class="form-grid">
+              <label for="toolFileCode"
+                >影片代碼<input
+                  id="toolFileCode"
+                  type="text"
+                  placeholder="輸入影片代碼" /></label
+              ><label for="toolDomain"
+                >播放器網域（帳號 Custom Domains 中的專屬網域）<input
+                  id="toolDomain"
+                  type="text"
+                  value="byse.sx" /></label
+              ><label for="toolSubUrl"
+                >字幕網址（選填，VTT 格式）<input
+                  id="toolSubUrl"
+                  type="url"
+                  placeholder="https://example.com/subtitle.vtt" /></label
+              ><label for="toolSubLabel"
+                >字幕語言標籤<input
+                  id="toolSubLabel"
+                  type="text"
+                  value="繁體中文" /></label
+              ><label for="toolPoster"
+                >影片封面網址（選填）<input
+                  id="toolPoster"
+                  type="url"
+                  placeholder="https://example.com/poster.jpg" /></label
+              ><label for="toolLogo"
+                >品牌標誌網址（選填）<input
+                  id="toolLogo"
+                  type="url"
+                  placeholder="https://example.com/logo.png"
+              /></label>
+            </div>
+            <div class="action-group">
+              <button type="button" class="" onclick="generateEmbedAdvanced()">
+                產生網址與嵌入碼<svg class="icon" aria-hidden="true">
+                  <use href="#i-arrow" />
+                </svg></button
+              ><button
+                type="button"
+                class="secondary"
+                onclick="copyResult('toolResult')"
+              >
+                複製結果</button
+              ><button type="button" class="secondary" onclick="previewEmbed()">
+                預覽播放器
+              </button>
+            </div>
+            <div id="toolResult" class="result-panel" role="status">
+              填入影片代碼與網域，即可產生嵌入碼。
+            </div>
+            <div id="toolIframePreview" class="player-preview"></div>
+          </article>
+          <div class="two-column-grid">
+            <article class="panel padded-panel">
+              <div class="section-title">
+                <h2>已刪除的影片</h2>
+                <p>查看帳號中的刪除記錄。</p>
+              </div>
+              <button
+                type="button"
+                class="secondary small"
+                onclick="loadDeleted()"
+              >
+                查看記錄
+              </button>
+              <div id="deletedResult" class="result-panel" role="status">
+                尚未查詢
+              </div>
+            </article>
+            <article class="panel padded-panel">
+              <div class="section-title">
+                <h2>版權通知</h2>
+                <p>查看影片的 DMCA 通知與處理資訊。</p>
+              </div>
+              <button
+                type="button"
+                class="secondary small"
+                onclick="loadDMCA()"
+              >
+                查看通知
+              </button>
+              <div id="dmcaResult" class="result-panel" role="status">
+                尚未查詢
+              </div>
+            </article>
+          </div>
+          <details class="panel disclosure">
+            <summary>
+              <span
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-tools" /></svg
+                >進階工具與連線診斷</span
+              >
+            </summary>
+            <div class="disclosure-content">
+              <div class="section-title">
+                <h3>服務連線檢查</h3>
+                <p>檢查帳號、檔案與上傳等 8 項服務是否能正常回應。</p>
+              </div>
+              <div class="action-group">
+                <button type="button" class="secondary" onclick="testAll()">
+                  檢查服務連線</button
+                ><button
+                  type="button"
+                  class="secondary"
+                  onclick="loadEmbedDomains()"
+                >
+                  查詢播放器網域
+                </button>
+              </div>
+              <div id="testAllResult" class="result-panel" role="status">
+                尚未執行檢查
+              </div>
+              <div id="embedDomainResult" class="result-panel" role="status">
+                網域查詢結果會顯示在這裡。
+              </div>
+              <hr />
+              <div class="section-title">
+                <h3>Premium HLS <span class="count-badge">實驗功能</span></h3>
+                <p>需要帳號支援；部分服務可能未開放此功能。</p>
+              </div>
+              <div class="form-grid">
+                <label for="toolIp"
+                  >觀看者 IP<input
+                    id="toolIp"
+                    type="text"
+                    placeholder="例如：8.8.8.8" /></label
+                ><label for="toolUa"
+                  >觀看裝置 User-Agent<input
+                    id="toolUa"
+                    type="text"
+                    value="Mozilla/5.0"
+                /></label>
+              </div>
+              <button type="button" class="secondary" onclick="tryPremiumHls()">
+                查詢 HLS 連結
+              </button>
+              <hr />
+              <div class="section-title">
+                <h3>播放器進度事件</h3>
+                <p>預覽播放器後，可在此查看播放進度回報。</p>
+              </div>
+              <button
+                type="button"
+                class="text-button"
+                onclick="clearProgressEvents()"
+              >
+                清除記錄
+              </button>
+              <div id="progressEvents" class="result-panel" role="status">
+                等待播放器回報進度…
+              </div>
+            </div>
+          </details>
+        </section>
+        <footer class="main-footer">
+          <span>留更多時間，給值得分享的故事。</span
+          ><span
+            >Byse Studio
+            <svg class="footer-star" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="m12 0 3.2 8.8L24 12l-8.8 3.2L12 24l-3.2-8.8L0 12l8.8-3.2Z"
+              /></svg
+          ></span>
+        </footer>
+      </main>
+    </div>
+    <dialog
+      id="connectionDialog"
+      class="modal"
+      aria-labelledby="connectionTitle"
+    >
+      <div class="modal-heading">
+        <div>
+          <span class="eyebrow">LET’S GET CONNECTED</span>
+          <h2 id="connectionTitle">連線你的工作空間</h2>
+        </div>
+        <button
+          class="icon-button"
+          onclick="closeSettings()"
+          aria-label="關閉連線設定"
+        >
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+      </div>
+      <p id="connectionSummary" class="muted">
+        選擇連線方式，開始管理你的影片。
+      </p>
+      <form id="connectionForm">
+        <label for="connectionMode"
+          >連線方式<select id="connectionMode">
+            <option value="proxy">本機代理伺服器（建議）</option>
+            <option value="direct">直接連線 Byse API</option>
+          </select></label
+        >
+        <div class="connection-fields">
+          <label for="proxyToken"
+            >代理存取密碼（伺服器有設定時才需填寫）<input
+              id="proxyToken"
+              type="password"
+              placeholder="BYSE_PROXY_TOKEN" /></label
+          ><label for="directApiKey"
+            >Byse API Key（直接連線時使用）<input
+              id="directApiKey"
+              type="password"
+              placeholder="輸入你的 API Key"
+          /></label>
+        </div>
+        <p class="field-help">
+          憑證僅在目前分頁的工作階段中保留。直接連線仍須服務支援跨來源請求。
+        </p>
+        <details class="setup-help">
+          <summary>如何啟動本機代理？</summary>
+          <p>在終端機設定環境變數後啟動：</p>
+          <pre>
+export BYSE_API_KEY='你的 API Key'
+uv run --no-project python byse_full_suite/server.py</pre>
+          <p>
+            請先依 README 安裝依賴。接著開啟
+            <code>http://127.0.0.1:5000</code>，即可使用代理連線。
+          </p>
+        </details>
+        <div id="connectionMessage" class="form-message" role="status"></div>
+        <div class="modal-actions">
+          <button type="button" class="secondary" onclick="closeSettings()">
+            取消</button
+          ><button type="submit">
+            儲存並連線<svg class="icon" aria-hidden="true">
+              <use href="#i-arrow" />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      id="confirmActionDialog"
+      class="modal small-modal"
+      aria-labelledby="confirmActionTitle"
+    >
+      <h2 id="confirmActionTitle">確認操作</h2>
+      <p id="confirmActionText"></p>
+      <form method="dialog" class="modal-actions">
+        <button class="secondary" value="cancel">取消</button
+        ><button id="confirmActionSubmit" class="danger" value="confirm">
+          確認
+        </button>
+      </form>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <noscript
+      ><div class="noscript-notice">
+        請啟用 JavaScript，以使用影片管理與上傳功能。
+      </div></noscript
+    >
+  </body>
 </html>
-<!-- Deployed at Sat Sep  5 12:31:52 UTC 2026 -->
+<!-- Deployed at Sun Sep  6 08:36:53 UTC 2026 -->

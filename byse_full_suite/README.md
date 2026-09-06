@@ -8,7 +8,9 @@
 byse_full_suite/
 ├── sdk.py              # 完整 SDK，封裝所有端點，含 fallback
 ├── cli.py              # 互動式 CLI (支援 rich)
-├── dashboard.html      # 單檔網頁儀表板，無需後端即可直接呼叫 API
+├── dashboard.html      # Byse Studio 工作空間
+├── dashboard.css       # 響應式樣式
+├── dashboard.js        # 連線、資料呈現與上傳佇列
 ├── server.py           # 可選 Flask 代理伺服器 (避免 CORS，處理本地上傳)
 └── README.md
 ```
@@ -92,48 +94,52 @@ python cli.py
 - 5 編碼監控
 - 6 工具箱 (test_all, deleted, dmca, premium HLS, 字幕產生器)
 
-## 3. Web Dashboard (dashboard.html)
+## 3. Byse Studio (dashboard.html)
 
-直接用瀏覽器打開即可，無需安裝：
+從專案根目錄啟動靜態預覽，不需要 API Key 即可探索示範資料：
 
 ```bash
-# 方法1: 直接打開檔案
-open dashboard.html
-
-# 方法2: 啟動簡易 HTTP
-cd byse_full_suite
-python -m http.server 8000
+uv run --no-project python -m http.server 8000 --directory byse_full_suite
 # 然後打開 http://localhost:8000/dashboard.html
 ```
 
-Dashboard 包含 6 個分頁：
+真實帳號建議透過下節的 Flask 代理連線。靜態模式可在「連線設定」選擇直接連線，但須服務支援跨來源請求；憑證僅保留在目前分頁的工作階段。
 
-- **帳號總覽** - info, stats, test_all
-- **檔案管理** - 分頁列表、搜尋、詳情、克隆、改標題/公開、縮圖、產生 embed
-- **資料夾** - 列表、建立
-- **上傳中心** - 拖曳本地上傳 (顯示進度)、遠端 URL 拉取
-- **編碼監控** - encoding/list, status, restart, delete
-- **工具箱** - deleted/dmca、進階 embed URL 產生器 (c1_file, poster, logo)、Premium HLS 實驗、即時監聽 byse-progress 事件 (postMessage)
+工作空間包含 6 個頁面：
+
+- **工作台** - 帳號摘要、近期影片、近 7 天觀看趨勢；未知資料不會被當成 0 或虛構圖表。
+- **影片資料庫** - 標題搜尋、分頁、選取後改名、複製、公開設定、縮圖與嵌入碼。
+- **資料夾** - 資料夾卡片、子目錄、建立與快速查看影片。
+- **上傳中心** - 拖曳選檔、移除佇列、傳送進度、失敗重試與遠端網址匯入。傳到代理後仍需等待伺服器確認完成。
+- **轉碼佇列** - 狀態查詢、重新轉碼；刪除任務前會要求確認。
+- **播放器與工具** - 字幕／封面／Logo 嵌入碼、複製、手動播放預覽、刪除與版權通知記錄，以及可展開的連線診斷／HLS 工具。
+
+示範模式僅供瀏覽，寫入操作與實際播放器預覽會停用。HTML、CSS、JS 須放在同一目錄，無需前端建置工具或外部字型／圖示服務。
 
 ### byse-progress 事件
 
 Byse 播放器在 iframe 內會 `window.postMessage({type:"byse-progress", file_code, progress, timestamp, duration})`。
-Dashboard 會即時 log，方便你做觀看進度追蹤。
+Dashboard 僅接受目前預覽 iframe 與其來源網域的進度事件，並顯示在進階工具中。產生嵌入碼不會自動載入播放器。
 
 ## 4. (可選) Flask 代理 server.py
 
-若遇到 CORS 問題，可用 server.py 代理：
+從專案根目錄安裝依賴並啟動代理：
 
 ```bash
-pip install flask flask-cors requests
-python server.py
+uv venv
+uv pip install -r requirements.txt
+export BYSE_API_KEY=你的KEY
+uv run --no-project python byse_full_suite/server.py
 # 打開 http://localhost:5000
 ```
 
 server.py 會：
 - 代理 /api/* 到 https://api.byse.sx/*
 - 處理 /upload (本地檔案轉發到 byse upload server)
-- 提供 dashboard.html
+- 提供 dashboard.html、dashboard.css、dashboard.js
+- 以 `/health` 回報連線設定狀態，不呼叫上游或回傳金鑰
+
+若設定 `BYSE_PROXY_TOKEN`，在網頁的「連線設定」填入相同的代理存取密碼即可。
 
 ## 快速測試 (你之前的 Key)
 
